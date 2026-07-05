@@ -1,0 +1,8 @@
+{
+  "name": "yuqing-monitor",
+  "version": "1.0.0",
+  "description": "国网人资舆情筛查系统",
+  "main": "main.js",
+  "author": "",
+  "license": "MIT"
+}

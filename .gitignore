@@ -1,0 +1,18 @@
+# 依赖包（可从 package.json 重新安装）
+node_modules/
+
+# 打包产物（可重新生成）
+dist/
+*.exe
+!国网人资舆情筛查系统.exe
+!国网人资舆情筛查系统-便携版.exe
+
+# macOS 系统文件
+.DS_Store
+
+# 用户敏感数据
+cookies.json
+
+# 编辑器配置
+.vscode/
+.idea/

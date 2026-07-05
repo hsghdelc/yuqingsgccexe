@@ -1,0 +1,3499 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>国网人资舆情筛查系统</title>
+<script src="./lib/xlsx.full.min.js"></script>
+<script src="./lib/exceljs.min.js"></script>
+<style>
+:root {
+  --bg: #0d1b2a;
+  --surface: #112233;
+  --surface2: #162840;
+  --surface3: #1d3550;
+  --border: #2a4a6a;
+  --border2: #1e3b58;
+  --accent: #00b4d8;
+  --accent2: #0077b6;
+  --accent-glow: rgba(0,180,216,0.15);
+  --danger: #ef4444;
+  --danger-bg: rgba(239,68,68,0.1);
+  --warn: #f59e0b;
+  --warn-bg: rgba(245,158,11,0.1);
+  --success: #10b981;
+  --success-bg: rgba(16,185,129,0.1);
+  --text: #e2eaf4;
+  --text2: #8baabf;
+  --text3: #5a7a96;
+  --radius: 12px;
+  --radius-lg: 18px;
+  --shadow: 0 4px 24px rgba(0,0,0,0.4);
+  --shadow-sm: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Microsoft YaHei', 'PingFang SC', system-ui, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── 顶部导航 ── */
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border2);
+  padding: 0 20px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+
+.topbar-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo-icon {
+  width: 28px;
+  height: 28px;
+  /* 去除原本的蓝绿色渐变背景和圆角，让 SVG 的原本样式完全展现出来 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.logo-text {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text);
+}
+
+.logo-sub {
+  font-size: 10px;
+  color: var(--text3);
+  letter-spacing: 1px;
+  margin-top: 1px;
+}
+
+.topbar-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+  margin: 0 2px;
+  flex-shrink: 0;
+}
+
+.topbar-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+  padding-left: 12px;
+}
+
+/* ── 主体布局 ── */
+.layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  height: calc(100vh - 52px);
+}
+
+/* ── 左侧边栏 ── */
+.sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border2);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.sidebar-section {
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--border2);
+}
+
+.sidebar-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--text3);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+/* ── 文件上传区 ── */
+.upload-zone {
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 20px 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--surface2);
+  position: relative;
+}
+
+.upload-zone:hover, .upload-zone.drag-over {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+
+.upload-zone input { display: none; }
+
+.upload-icon { font-size: 28px; margin-bottom: 8px; }
+.upload-text { font-size: 12px; color: var(--text2); line-height: 1.6; }
+.upload-text strong { color: var(--accent); }
+
+/* 文件信息 */
+.file-info {
+  background: var(--surface2);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-size: 12px;
+}
+
+.file-info-name {
+  color: var(--accent);
+  font-weight: 600;
+  word-break: break-all;
+  margin-bottom: 4px;
+}
+
+.file-info-meta { color: var(--text2); }
+
+/* Sheet 选择 */
+.sheet-select-wrap { margin-top: 10px; }
+.sheet-select-wrap label { font-size: 11px; color: var(--text2); display: block; margin-bottom: 5px; }
+
+select {
+  width: 100%;
+  background: var(--surface3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 7px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='%238baabf'%3E%3Cpath d='M7 10l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 28px;
+}
+
+select:focus { border-color: var(--accent); }
+
+/* 识别模式选择 */
+.mode-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.mode-tab {
+  flex: 1;
+  padding: 8px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text2);
+  font-size: 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  line-height: 1.4;
+}
+
+.mode-tab:hover { border-color: var(--accent); color: var(--text); }
+
+.mode-tab.active {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* 统计卡 */
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.stat-card {
+  background: var(--surface2);
+  border-radius: var(--radius);
+  padding: 10px;
+  text-align: center;
+}
+
+.stat-num {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.stat-num.danger { color: var(--danger); }
+.stat-num.warn { color: var(--warn); }
+.stat-num.success { color: var(--success); }
+
+.stat-label {
+  font-size: 10px;
+  color: var(--text3);
+  margin-top: 4px;
+}
+
+/* 进度 */
+.progress-wrap { margin-top: 10px; }
+
+.progress-bar-bg {
+  height: 6px;
+  background: var(--surface3);
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 6px 0;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent2), var(--accent));
+  border-radius: 3px;
+  transition: width 0.3s;
+  width: 0%;
+}
+
+.progress-text {
+  font-size: 11px;
+  color: var(--text2);
+  display: flex;
+  justify-content: space-between;
+}
+
+/* ── 主内容区 ── */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Tab 切换 */
+.main-tabs {
+  display: flex;
+  gap: 0;
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.main-tabs::-webkit-scrollbar { display: none; }
+
+.main-tab {
+  padding: 16px 14px;
+  font-size: 12px;
+  color: var(--text2);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.main-tab:hover { color: var(--text); }
+
+.main-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* 面板 */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-lg);
+  padding: 20px 22px;
+  margin-bottom: 16px;
+}
+
+.panel-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-title .icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: var(--accent-glow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+}
+
+/* 表单 */
+.form-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.form-row:last-child { margin-bottom: 0; }
+
+.form-label {
+  font-size: 12px;
+  color: var(--text2);
+  flex-shrink: 0;
+  width: 80px;
+}
+
+input[type="text"], input[type="password"], input[type="url"] {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 8px 12px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="url"]:focus { border-color: var(--accent); }
+
+input::placeholder { color: var(--text3); }
+
+/* 按钮 */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent2), var(--accent));
+  color: #fff;
+  box-shadow: 0 2px 12px rgba(0,180,216,0.3);
+}
+
+.btn-primary:hover { box-shadow: 0 4px 20px rgba(0,180,216,0.5); transform: translateY(-1px); }
+
+.btn-secondary {
+  background: var(--surface3);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+.btn-danger {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid rgba(239,68,68,0.3);
+}
+
+.btn-danger:hover { background: rgba(239,68,68,0.2); }
+
+.btn-success {
+  background: var(--success-bg);
+  color: var(--success);
+  border: 1px solid rgba(16,185,129,0.3);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text2);
+  border: 1px solid var(--border);
+}
+
+.btn-ghost:hover { color: var(--text); border-color: var(--accent); }
+
+.btn-sm { padding: 5px 12px; font-size: 12px; }
+
+/* 状态徽章 */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.badge-default { background: var(--surface3); color: var(--text2); }
+.badge-success { background: var(--success-bg); color: var(--success); }
+.badge-danger { background: var(--danger-bg); color: var(--danger); }
+.badge-warn { background: var(--warn-bg); color: var(--warn); }
+.badge-info { background: var(--accent-glow); color: var(--accent); }
+
+/* 阈值滑块 */
+.threshold-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.slider-wrap { flex: 1; }
+
+.slider-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text3);
+  margin-bottom: 7px;
+  letter-spacing: 0.3px;
+}
+
+input[type="range"] {
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+  background: linear-gradient(to right,
+    var(--accent2) 0%, var(--accent) var(--pct, 16%),
+    var(--surface3) var(--pct, 16%), var(--surface3) 100%);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--accent);
+  cursor: pointer;
+  box-shadow: 0 0 0 4px rgba(0,180,216,0.18), 0 2px 6px rgba(0,0,0,0.4);
+  transition: box-shadow 0.15s, transform 0.1s;
+}
+input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.12); }
+input[type="range"]:active::-webkit-slider-thumb { box-shadow: 0 0 0 7px rgba(0,180,216,0.25), 0 2px 6px rgba(0,0,0,0.4); }
+
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--accent);
+  cursor: pointer;
+}
+input[type="range"]::-moz-range-progress {
+  height: 6px;
+  border-radius: 4px;
+  background: linear-gradient(to right, var(--accent2), var(--accent));
+}
+
+.threshold-val {
+  background: linear-gradient(135deg, var(--accent2), var(--accent));
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  min-width: 52px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0,180,216,0.3);
+}
+
+/* 模型配置列表 */
+.model-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+
+.model-item {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.model-item.active { border-color: var(--accent); background: var(--accent-glow); }
+
+.model-item-info { flex: 1; min-width: 0; }
+.model-item-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.model-item-url { font-size: 11px; color: var(--text3); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 词库面板 */
+.lexicon-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; align-items: stretch; }
+
+.lexicon-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.lexicon-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.lexicon-card-title { font-size: 12px; font-weight: 700; }
+.lexicon-card-title.entity { color: #60a5fa; }
+.lexicon-card-title.domain { color: #a78bfa; }
+.lexicon-card-title.negative { color: var(--danger); }
+
+.lexicon-count {
+  font-size: 11px;
+  color: var(--text3);
+  background: var(--surface3);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.lexicon-textarea {
+  width: 100%;
+  height: 180px;
+  min-height: 180px;
+  flex: 1 1 auto;
+  background: var(--surface3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 11px;
+  padding: 8px 10px;
+  resize: vertical;
+  line-height: 1.8;
+  outline: none;
+  font-family: 'Microsoft YaHei', monospace;
+}
+
+.lexicon-textarea:focus { border-color: var(--accent); }
+
+/* ── 实体词库强弱高亮（textarea + 彩色背板叠加）── */
+.lexicon-hl-wrap { position: relative; width: 100%; height: 180px; }
+
+.lexicon-hl-backdrop,
+.lexicon-textarea-hl {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 1.8;
+  font-family: 'Microsoft YaHei', monospace;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  box-sizing: border-box;
+}
+
+.lexicon-hl-backdrop {
+  background: var(--surface3);
+  color: var(--text);
+  overflow: auto;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.lexicon-textarea-hl {
+  background: transparent;
+  color: transparent;
+  caret-color: var(--text);
+  resize: vertical;
+  outline: none;
+  z-index: 2;
+}
+.lexicon-textarea-hl:focus { border-color: var(--accent); }
+/* 背板高亮配色：与「强 X · 弱 Y」统计文字一致 */
+.ent-strong { color: #34d399; font-weight: 600; }
+.ent-weak   { color: #fbbf24; }
+
+/* 日志 */
+.log-container {
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 12px;
+  max-height: 220px;
+  overflow-y: auto;
+  line-height: 1.7;
+}
+
+.log-line { display: flex; gap: 10px; }
+.log-time { color: var(--text3); flex-shrink: 0; }
+.log-msg { color: var(--text2); }
+.log-msg.ok { color: var(--success); }
+.log-msg.err { color: var(--danger); }
+.log-msg.warn { color: var(--warn); }
+.log-msg.info { color: var(--accent); }
+
+/* 预览表格 */
+.preview-wrap {
+  overflow: auto;
+  max-height: 456px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border2);
+}
+
+.preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.preview-table th {
+  background: var(--surface3);
+  color: var(--text2);
+  padding: 8px 12px;
+  font-weight: 600;
+  font-size: 11px;
+  text-align: left;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border-bottom: 1px solid var(--border);
+}
+
+.preview-table td {
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border2);
+  color: var(--text);
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.preview-table tr:hover td { background: var(--surface2); }
+
+.preview-table td.hit {
+  background: rgba(245,158,11,0.12);
+  color: var(--warn);
+}
+
+.preview-table td.yq-yes { color: var(--danger); font-weight: 700; }
+.preview-table td.yq-ai { color: var(--danger); font-weight: 700; }
+
+/* 信息提示 */
+.info-box {
+  background: var(--accent-glow);
+  border: 1px solid rgba(0,180,216,0.2);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.7;
+  margin-top: 10px;
+}
+
+.warn-box {
+  background: var(--warn-bg);
+  border: 1px solid rgba(245,158,11,0.25);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-size: 12px;
+  color: #fcd34d;
+  line-height: 1.7;
+  margin-top: 10px;
+}
+
+/* 页签内容 */
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+
+/* 分隔线 */
+.divider {
+  height: 1px;
+  background: var(--border2);
+  margin: 16px 0;
+}
+
+/* 工具行 */
+.toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* 滚动条 */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent2); }
+
+/* 响应式 */
+@media (max-width: 900px) {
+  .lexicon-grid { grid-template-columns: 1fr; }
+  .sidebar { width: 220px; }
+}
+
+/* 结果高亮行 */
+.row-marked { background: rgba(239,68,68,0.05); }
+
+/* 添加模型弹窗 */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  display: none;
+}
+
+.modal-overlay.open { display: flex; }
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  width: 480px;
+  max-width: 95vw;
+  box-shadow: var(--shadow);
+}
+
+.modal-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 18px;
+  color: var(--text);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+/* 彩色点 */
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dot-green { background: var(--success); box-shadow: 0 0 6px var(--success); }
+.dot-red { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+.dot-yellow { background: var(--warn); }
+.dot-gray { background: var(--text3); }
+
+/* 动画 */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.pulsing { animation: pulse 1.4s ease-in-out infinite; }
+
+/* 空状态 */
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text3);
+}
+
+.empty-state .emoji { font-size: 40px; margin-bottom: 12px; }
+.empty-state p { font-size: 13px; line-height: 1.8; }
+
+/* ── 左侧边栏底部区域 ── */
+.sidebar-info-card {
+  flex-grow: 1; /* 强制占据下方所有剩余空间 */
+  margin-top: 0;
+  padding: 20px 16px;
+  background: var(--surface2);
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.info-card-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.info-card-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--text3);
+  text-transform: uppercase;
+}
+
+.info-card-url-wrapper {
+  background: rgba(0, 0, 0, 0.15);
+  padding: 8px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.info-card-url {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.2s;
+  word-break: break-all;
+}
+
+.info-card-url:hover {
+  color: #fff;
+}
+
+/* 系统状态信息样式 */
+.info-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.05);
+  padding-top: 12px;
+}
+
+.meta-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text2);
+}
+
+.meta-label {
+  color: var(--text3);
+}
+
+.meta-val.status-online {
+  color: var(--success);
+  font-weight: bold;
+}
+
+/* ── 系统首页与国网 Logo 严格对齐左上角样式 ── */
+.hero-panel {
+  background: radial-gradient(circle at center top, var(--surface3) 0%, var(--surface) 100%);
+  border-bottom: none;
+}
+
+/* 欢迎页专用：全新正方形包裹容器 */
+.sgcc-logo-welcome-wrap {
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 24px;
+  display: block;
+}
+
+/* 让内部的 SVG 完美填满正方形 */
+.sgcc-logo-welcome-wrap svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.workflow-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.workflow-step {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 24px 16px;
+  text-align: center;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.workflow-step:hover {
+  border-color: var(--accent);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.step-num {
+  position: absolute;
+  top: -8px;
+  right: -4px;
+  font-size: 48px;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.03);
+  font-style: italic;
+  pointer-events: none;
+}
+
+.step-icon {
+  font-size: 28px;
+  margin-bottom: 12px;
+}
+
+.step-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.step-desc {
+  font-size: 11px;
+  color: var(--text3);
+  line-height: 1.6;
+}
+
+/* 响应式适配 */
+@media (max-width: 1100px) {
+  .workflow-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- 顶部导航 -->
+<div class="topbar">
+  <div class="topbar-logo">
+    <div class="logo-icon">
+      <!-- 替换为国家电网的 SVG 图标，宽高设为100%填满容器 -->
+      <svg width="100%" height="100%" viewBox="3.645 1.707 245.062 248.129" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+        <radialGradient id="a" cx="5158.995" cy="5188.7" gradientTransform="matrix(.05264 0 0 .05242 -190.315 -196.148)" gradientUnits="userSpaceOnUse" r="1707.25">
+          <stop offset="0" stop-color="#fff"/>
+          <stop offset=".22" stop-color="#6abf99"/>
+          <stop offset=".71" stop-color="#01574f"/>
+          <stop offset="1" stop-color="#00524b"/>
+        </radialGradient>
+        <g fill-rule="evenodd">
+          <path d="m126.281 38.246c44.739 0 82.004 32.82 88.793 75.547-22.422 26.316-57.793 43.406-97.476 43.406-5.371 0-10.477-.262-15.371-.785a129.543 129.543 0 0 1 -5.528-37.535c0-31.195 9.528-54.05 27.582-75.652l-1 .996c-22.476 23.277-34.476 49.593-34.476 85.557 0 8.492.738 16.828 2.21 24.903-6.738-1.364-13.05-3.356-19.105-5.82-.527-4.56-.844-9.227-.844-13.946 0-39.684 19.739-74.863 49.899-96.461a91.179 91.179 0 0 1 5.367-.156zm89.793 94.473c-2.316 41.836-33.683 76.226-74.32 83.304-10.418-8.496-19.422-18.875-26.633-30.671 2.055.054 4.16.105 6.211.105 36.16 0 62.531-10.273 85.902-29.46.157-.106.684-.63 1-.84-21.687 15.413-44.687 23.59-75.953 23.59a155.47 155.47 0 0 1 -21.738-1.52c-2.367-4.614-4.422-9.383-6.211-14.313 7.578 1.313 15.582 1.941 24.16 1.941 30.844 0 59.477-9.542 81.426-26.109 1-.785 3.527-3.25 6.05-5.976zm-123.953 27.363c1.106 4.879 2.422 9.598 4 14.211-7.105-1.73-13.95-3.984-20.422-6.711a119.085 119.085 0 0 1 -3.316-15.152c6.265 3.144 12.789 5.66 19.738 7.601zm7.79 23.961c4.21 9.7 9.581 18.664 15.948 26.789.844 1.047 3.579 3.723 6.633 6.395-7.265-.313-14.316-1.465-21-3.407a119.489 119.489 0 0 1 -21.32-33.656 159.512 159.512 0 0 0 19.793 3.879zm1.526 29.777h-.05zm-.472-.105h-.055zm-.055 0c-.05 0-.105-.05-.156-.05.05 0 .105.05.156.05zm-.156-.05c-24.895-7.34-45.32-25.165-56.11-48.286 9.317 5.61 19.633 10.117 30.739 13.473a125.1 125.1 0 0 0 25.37 34.812zm-63.11-70.567c-.894-4.98-1.316-10.118-1.316-15.309 0-37.117 22.844-69.098 55.266-82.621-.211.105-.418.156-.578.262-17.684 21.492-28.317 48.965-28.317 78.847 0 7.235.633 14.313 1.844 21.23-8.004-3.984-15.527-8.964-22.95-14.886.262.262.84.84 1 .941 7.157 6.66 14.634 12.32 22.528 17.04 1.106 5.609 2.629 11.062 4.473 16.359-12.16-5.77-22.95-13.16-31.895-21.809z" fill="url(#a)"/>
+          <g fill="#00524b">
+            <path d="m41.91 56.598 2.05 1.992c3.845-4.195 7.423-7.918 10.79-11.117l-2.05-1.993c-.473.473-.95.997-1.372 1.524l-.101-1.836c-.16 0-.844.05-2.106.05h-1.105l1.472-1.413-2.16-2.047c-.734.894-1.945 2.097-3.473 3.722l-1.894-1.832c2-2.046 3.367-3.41 4.156-4.144l-2.156-2.098c-3.527 3.883-7 7.446-10.422 10.75l2.161 2.044a180.953 180.953 0 0 1 4-4.246l1.895 1.836a120.306 120.306 0 0 1 -3.633 3.617l2.105 2.043 3.528-3.722 2.578 2.52-4.367 4.401zm6.578-6.711-2.578-2.52 1.262-1.308c0 .68-.05 1.308-.156 1.941 1.418-.105 2.523-.105 3.312 0zm-20.948-1.887 16.844 16.2c.105.155.262.312.422.468l2.261-2.36-.261-.261 11.422-11.742.367.367 2.367-2.41-15.685-14.942c-.632-.578-1.16-1.207-1.738-1.785l-15.633 16.149c-.156.105-.261.261-.418.367zm17.266 12.004-12.793-12.32 11.421-11.744 12.793 12.32zm34-21.965c.738-.422 1.261-.84 1.632-1.312.63-.68.895-1.47.79-2.36-.16-1.52-1.106-3.512-2.844-5.976.21-.313.422-.63.683-.891 1.317 1.363 2.582 2.36 3.688 3.04 1.789 1.05 4.105 1.73 6.894 1.991.157-1.203.368-2.46.735-3.668-3.79.313-7-.996-9.63-3.879l2-3.41c-1.581-.262-2.737-.574-3.526-.89-.739 1.886-1.684 3.777-2.79 5.664-.843-.473-1.738-.735-2.683-.891l1.84-2.676c-.473-.05-.895-.105-1.367-.21l5.945-2.778-1.262-2.621-14.578 7.078 1.262 2.621a129.69 129.69 0 0 1 5.633-2.832c-1.895 2.36-4.266 4.508-7.211 6.344 1.367.84 2.316 1.469 2.789 1.887 1.789-1.57 3.472-3.094 4.949-4.614.101.055.207.055.367.106-1.95 3.039-4.16 5.398-6.633 7.183 1.211.68 2.106 1.309 2.684 1.832 2.371-2.254 4.527-4.875 6.476-7.863.157.106.313.262.473.367-2.105 4.145-5 7.551-8.633 10.278 1.16.574 2.106 1.203 2.895 1.886 3.472-3.566 6-6.761 7.527-9.437.528 1.101.79 1.836.738 2.308-.054.47-.316.786-.843 1.047-.473.262-1.051.473-1.684.63 1 .839 1.84 1.679 2.473 2.57.316-.211.683-.368 1.054-.579zm-17.423-10.488 3.105-1.52c-.316-.574-.789-1.57-1.527-2.933l15.738-7.657 1.473 3.094 3.105-1.52c-1.05-1.94-2-3.878-2.84-5.769l-9.527 4.719.422-.836c-2.055-.578-3.16-.84-3.422-.945-.633.996-1.262 1.886-1.95 2.671.74.16 1.317.368 1.895.579l-9.261 4.402 2.789 5.664zm35.37-20.863c.685 4.664 1.317 9.855 1.895 15.57l3.368-.422-.051-.418 5.156-.629c.371 3.094.633 4.824.79 5.242.21.524.581.89 1.16 1.051.945.207 4.527-.055 10.632-.789.05-.05.156-.05.262-.05a7.881 7.881 0 0 0 1.21-.423c.579-.261 1.052-.836 1.368-1.726.21-.735.422-1.68.633-2.727a17.07 17.07 0 0 1 -3.473-1.207c0 1.313-.21 2.203-.582 2.672-.312.316-1.789.684-4.418.996-1.105.16-1.894.211-2.476.266-.368 0-.63 0-.79-.055-.421-.05-.628-.312-.683-.785l-.367-2.883 5.894-.734.051.523 3.371-.418a284.844 284.844 0 0 1 -1.95-15.625l-9.26 1.258c-.161-1.465-.317-2.727-.317-3.668l-3.371.418.527 3.672-8.527.941zm4.157 5.82-.367-3.094 5.16-.629.367 3.094zm.738 5.922-.367-3.094 5.156-.629.368 3.094zm7.633-6.973-.37-3.094 5.898-.734.367 3.094zm.735 5.926-.368-3.094 5.895-.734.371 3.093zm22.793 7.234 3.527.63 1.156-6.817c.633.785 1.211 1.68 1.633 2.675 1.316-1.261 2.316-2.359 3.105-3.355.157.68.317 1.309.368 1.938.949-.63 1.949-1.102 3-1.47l-1.368-3.984c.422-.89.895-1.832 1.317-2.933.894 1.625 1.578 3.094 2 4.457-1.527 2.62-3.106 4.402-4.793 5.293 1.055.84 1.844 1.625 2.371 2.414 1.156-.895 2.422-2.258 3.84-4.04.316 1.052.582 2.048.738 3.044 1.266-.895 2.266-1.524 2.895-1.836l-1.157-3.305-.527-1.414c.633-1.574 1.156-2.937 1.527-4.035.368-1.102.63-1.941.84-2.36-.894-.21-2-.527-3.261-.996-.211 1.098-.528 2.254-.895 3.457a24.11 24.11 0 0 0 -.95-1.992c-.683.473-1.577.84-2.577 1.157.683-1.786 1.054-2.782 1.16-3.094-1.317-.367-2.371-.735-3.16-1.207-.262 1.258-.578 2.465-1.051 3.672l-1.055-2.309c-.894.523-1.683.84-2.422.996l.633-3.668 15.16 2.672-2.793 15.781c-.05.418-.207.68-.367.785-.473.157-1.422 0-2.894-.472.421 1.52.578 2.883.472 3.984 2.528.262 4.106.16 4.844-.367.473-.313.844-1.363 1.21-3.145l3.474-19.187c-8.368-1.363-15.684-2.621-21.95-3.879-1.105 7.184-2.472 14.836-4.05 22.856zm6.21-14.836c.684 1.414 1.262 2.778 1.84 4.192-.734 1.523-1.84 2.882-3.312 4.039zm31.477 13.735c4.262-.946 8.05-2.516 11.418-4.825.527-.367 1.316-.84 2.316-1.52a14.152 14.152 0 0 1 -2.367-2.882c-3.633 3.406-7.738 5.242-12.37 5.398h-.102c.472.997.894 2.254 1.156 3.829zm15.895 17.351c-.317-2.254-.844-5.554-1.684-9.855-.844.156-1.95.21-3.422.105.367 1.52.684 3.04.895 4.563l-9.371-4.145c2.687-.941 6.054-2.515 10.054-4.664-.789-.945-1.527-2.098-2.261-3.46-2.95 2.882-6.528 4.874-10.633 5.925-.633.105-1.317.156-2.055.207.16 1.207.106 2.52-.156 3.828.156.055.316.106.472.106 1.473.261 6.211 1.992 14.16 5.242.106 1.047.157 1.992.106 2.937a32.617 32.617 0 0 1 3.895-.84zm.422-23.379c-.106.364-.317.996-.528 1.887-.367 1.102-.472 2.46-.422 4.09 0 3.617 1.317 6.867 3.79 9.855 1.527-1.156 2.632-1.886 3.421-2.254-2.949-2.52-4.21-5.609-3.894-9.23.156-1.465.527-2.672 1.21-3.668-1-.418-2.105-.996-3.21-1.73-.16.316-.262.683-.368.996zm32.05 32.399c-5.05-5.035-9.21-9.332-12.472-12.899l-2.317 2.203c3.266 3.04 7.422 7.34 12.528 12.844l2.261-2.203zm-10.261-13.947c1.421 1.364 5.843 5.871 13.367 13.579l-12 11.53c-.367.368-.63.528-.84.579-.211 0-.578-.211-1-.629l-1.527-1.625c-.579 1.363-1.211 2.516-1.95 3.355 1.211 1.102 2.266 1.887 3.106 2.305.894.473 1.582.63 2.105.422.266-.16 5.106-4.773 14.528-13.789l2.105-1.941c-5.629-5.61-10.84-10.957-15.578-16.094l-2.367 2.254zm-4.211 6.082-7.106 6.813c3.578 3.355 6.79 6.66 9.633 9.96 2.684-2.827 5.05-5.085 7.105-6.812-3.949-3.933-7.16-7.238-9.632-9.96zm2.472 12.215-5-5.14 2.633-2.516 5 5.137zm0 0"/><path d="m126.176 33.11c52.32 0 95.004 42.515 95.004 94.628 0 52.11-42.684 94.63-95.004 94.63s-95.004-42.52-95.004-94.63c0-52.113 42.683-94.629 95.004-94.629zm0-4.09c54.582 0 99.11 44.351 99.11 98.718 0 54.364-44.528 98.715-99.11 98.715s-99.11-44.351-99.11-98.715c0-54.367 44.528-98.718 99.11-98.718zm0 0"/><path d="m16.855 73.11 5.579.945-.262 1.832c-1.422 0-2.688.316-3.738.894-1.055.574-1.844 1.414-2.317 2.461-.316.684-.422 1.363-.316 2.047.105.629.422 1.102.894 1.363.684.368 1.684-.316 3.055-2.047.21-.261.367-.468.527-.628.79-.942 1.418-1.676 1.84-2.149s.79-.734 1.055-.89a3.628 3.628 0 0 1 1.789-.473c.629 0 1.21.156 1.84.472 1.16.63 1.894 1.626 2.21 3.04.317 1.418.16 2.832-.523 4.246-.265.578-.633 1.101-1 1.574-.422.473-.898.84-1.422 1.207l.524.68-.578 1.257-4.367-.89.21-1.625c1.106-.051 2.106-.313 2.946-.84.844-.523 1.476-1.203 1.894-2.043.317-.629.422-1.207.371-1.781-.054-.528-.265-.895-.683-1.102-.633-.367-1.738.418-3.211 2.36-.317.418-.582.734-.79.996-1.21 1.464-2.21 2.41-3.054 2.726-.844.313-1.844.156-2.894-.422-1.317-.734-2.16-1.836-2.473-3.406-.371-1.574-.106-3.2.684-4.824a6.566 6.566 0 0 1 1-1.469c.421-.469.945-.941 1.683-1.465l-.738-.683.582-1.207zm4.63 22.437.105-.313c.265-.89.265-1.73 0-2.515-.262-.79-.84-1.574-1.684-2.465l.95-1.258 3.734 2.988-3.473 12.11-4.683.261-.106-1.625c1.156-.21 2.05-.523 2.684-1.046.633-.473 1.054-1.157 1.316-2.047l.106-.313-7.684-2.52c-1.105-.367-1.79-.468-2.16-.312-.367.156-.63.524-.84 1.207l-1.688-.527 2.106-7.285 1.687.574c-.16.684-.16 1.207.106 1.523.207.313.894.68 2 1.047l7.684 2.516zm-15.735 11.902 1.262-6.344 1.738.418c-.105 1.102.523 2.098 1.84 3.094l.105.055 9.055 6.707-.684 3.41-11.316 1.938c-.844.16-1.422.316-1.688.578-.261.21-.472.629-.683 1.101l-1.734-.367 1.472-7.445 1.684.367-.051.156c-.105.528-.105.945-.055 1.207.106.262.266.418.578.473.106 0 .211.05.317.05.105 0 .21 0 .316-.05l2.106-.367.949-4.825-1.793-1.101a1.28 1.28 0 0 1 -.262-.156c-.05-.051-.105-.051-.21-.051-.317-.055-.579 0-.79.262-.21.261-.367.629-.527 1.257l-1.684-.367zm6.84 1.364-.63 3.25 4.474-.524-3.79-2.676zm4 15.726v-.312c.055-.946-.156-1.73-.578-2.415-.422-.68-1.157-1.308-2.211-1.937l.633-1.469 4.316 1.938-.633 12.636-4.472 1.47-.473-1.524c1.101-.469 1.894-1.047 2.367-1.676.527-.629.79-1.414.84-2.36v-.312l-8-.473c-1.156-.054-1.84 0-2.211.262-.313.211-.523.68-.578 1.414l-1.79-.105.368-7.602 1.793.106c0 .734.101 1.207.418 1.468.316.262 1 .418 2.16.473l8 .473zm-12.367 11.113 1.738-.207c.101.68.312 1.153.684 1.364.316.207 1.05.207 2.21.101l5.473-.73c1.156-.16 1.844-.368 2.106-.633.261-.262.367-.785.316-1.465l1.734-.21 1.477 12.737-4.055 2.676-.84-1.312c1-.942 1.735-1.938 2.157-2.989a7.002 7.002 0 0 0 .472-3.3c-.105-.684-.261-1.157-.472-1.313-.262-.207-.739-.262-1.528-.156l-2.05.262.105.734c.105.785.316 1.309.629 1.574.316.262.95.313 1.844.262l.21 1.625-6.472.836-.211-1.625c.84-.207 1.418-.524 1.79-.89.366-.368.472-.891.42-1.52l-.105-.735-3.37.422c-.79.102-1.262.262-1.423.524-.207.261-.261.734-.156 1.468.156 1.203.633 2.305 1.422 3.352.84 1.05 1.895 1.89 3.211 2.52l-.578 1.57-5.16-1.676-1.473-13.055zm10.422 42.625.894-1.101a6.269 6.269 0 0 1 -1.738-1.574 8.867 8.867 0 0 1 -1.211-2.204c-.367-.996-.578-1.937-.578-2.777 0-.89.156-1.781.527-2.621.367-.89.945-1.73 1.734-2.516.793-.785 1.688-1.363 2.688-1.836 1.05-.472 2.05-.734 3-.785.945-.054 1.84.157 2.789.524.895.367 1.684.945 2.367 1.73a9.428 9.428 0 0 1 1.684 2.727c.21.523.37 1.101.476 1.676.106.578.106 1.207.106 1.886l.683.055.528 1.309-4.004 3.41-1.156-1.364c.894-1.207 1.472-2.308 1.738-3.304.262-.996.21-1.938-.16-2.828-.473-1.157-1.262-1.891-2.367-2.098-1.106-.211-2.473.05-4.16.785-1.63.734-2.735 1.625-3.313 2.57-.582.996-.688 2.043-.211 3.25.367.891.84 1.52 1.473 1.887.632.367 1.261.418 1.945.106.476-.211.793-.524.898-.891.102-.367.051-.895-.16-1.523l1.528-.735 2.632 6.711-1.582.684c-.367-.578-.734-.946-1.105-1.051-.367-.102-.895 0-1.524.316l-3.527 1.625-.844-2.097zm2.84 6.133 1.421-1.101c.422.578.79.84 1.16.89.368 0 1.051-.312 2-1.047l4.524-3.41c.95-.68 1.476-1.258 1.582-1.625.105-.367 0-.89-.371-1.465l1.422-1.101 4.578 7.023c1.105 1.68 1.633 3.145 1.687 4.403 0 1.261-.527 2.257-1.582 3.093-.789.578-1.578.84-2.418.79-.793-.055-1.687-.473-2.582-1.262l-1.367 4.668c-.156.629-.262 1.101-.21 1.52.054.421.16.839.421 1.312l-1.422 1.047-2.578-3.985 2.578-7.707-.738-1.101-1.473 1.101c-.945.684-1.472 1.258-1.578 1.625-.105.422 0 .89.367 1.469l-1.472 1.101-4.106-6.238zm9.792-.262c.051.106.106.157.157.262.054.106.156.207.261.367.739 1.102 1.422 1.832 2.106 2.149.687.316 1.316.262 1.949-.211.578-.418.844-.996.895-1.676.054-.734-.211-1.469-.739-2.254-.367-.523-.683-.84-1-.89-.312-.055-.789.156-1.418.628l-2.16 1.625zm15.79 11.48-1.368 1.208c-.422-.527-.844-.79-1.21-.734-.372 0-1 .418-1.895 1.203l-4.266 3.828c-.894.785-1.367 1.363-1.422 1.781-.105.422.055.895.477 1.418l-1.371 1.203-4.578-5.816 1.367-1.207c.422.523.844.785 1.21.734.372 0 1-.418 1.895-1.207l4.266-3.824c.894-.79 1.367-1.418 1.473-1.785.105-.418-.051-.89-.473-1.414l1.367-1.207 4.578 5.82zm2.105 7.708-5.055 5.61c-.523.628-.789 1.046-.789 1.413 0 .317.266.735.738 1.258 1.051 1.102 2.211 1.574 3.473 1.469 1.266-.106 2.527-.84 3.684-2.149 1.21-1.312 1.793-2.675 1.898-4.039.05-1.363-.422-2.62-1.476-3.668-.473-.523-.895-.734-1.211-.734s-.735.316-1.317.945zm-11.422 4.297 1.21-1.363c.474.472.946.683 1.317.628.368-.05.946-.523 1.735-1.414l3.843-4.246c.79-.89 1.211-1.52 1.262-1.941.055-.418-.156-.89-.629-1.363l1.211-1.364 5.211 5.403c2 2.043 3.05 4.09 3.262 6.132s-.527 3.985-2.106 5.766c-1.632 1.785-3.367 2.621-5.316 2.52-1.895-.16-3.84-1.207-5.844-3.305l-5.207-5.399zm37.266 22.965 1.156 1.73c-1.367.996-2.684 1.52-4.05 1.676-1.372.105-2.634-.211-3.895-.945a8.718 8.718 0 0 1 -2.211-1.993c-.633-.836-1.106-1.726-1.371-2.62-.313-1.098-.418-2.15-.262-3.196.156-1.05.472-2.152 1.105-3.25.578-1.102 1.262-1.992 2.055-2.621a7.068 7.068 0 0 1 2.734-1.363c.844-.211 1.684-.262 2.578-.106s1.688.473 2.477.942a8.91 8.91 0 0 1 1.316 1.101c.368.422.735.945 1.051 1.469l.633-.629 1.106.68-1.106 5.875-1.633-.368c.156-1.468.055-2.726-.261-3.777-.317-1.101-.895-1.832-1.633-2.305-.95-.578-1.95-.578-3 0-1.055.575-2 1.676-2.895 3.25-.844 1.625-1.265 3.04-1.16 4.297.105 1.258.688 2.203 1.688 2.887.734.469 1.578.629 2.578.523s2-.472 2.945-1.101zm7.578.941c-.63 1.836-.84 3.356-.578 4.613.261 1.258.949 2.098 2.05 2.57 1.106.473 2.16.313 3.16-.417.946-.735 1.79-2.047 2.422-3.828.63-1.836.84-3.356.579-4.614-.262-1.258-.95-2.097-2.055-2.57-1.102-.473-2.156-.313-3.106.418-.945.734-1.789 2.047-2.418 3.828zm-3.735-1.57c.79-2.258 2.102-3.778 3.946-4.614 1.843-.84 3.843-.789 6 .102 2.16.895 3.683 2.309 4.527 4.246.844 1.942.895 4.04.05 6.293-.788 2.254-2.105 3.774-3.945 4.613-1.843.84-3.843.786-6-.105-2.16-.89-3.683-2.305-4.527-4.246-.844-1.938-.844-4.035-.05-6.29zm14.368 13.89.421-1.836c.633.16 1.106.055 1.422-.207.313-.261.578-.996.84-2.203l1.266-5.765c.261-1.207.312-1.993.156-2.36s-.527-.683-1.21-.84l.421-1.835 7.789 1.94c1.844.474 3.211 1.153 4 2.044.79.89 1.055 2.047.738 3.41-.21.996-.632 1.781-1.316 2.305-.633.523-1.527.84-2.684.89l1.895 4.457c.262.578.527.996.789 1.258s.633.524 1.105.684l-.367 1.781-4.422-1.102-2.894-7.601-1.211-.313-.422 1.887c-.262 1.203-.316 1.992-.156 2.36.156.367.578.68 1.207.835l-.418 1.836-6.95-1.73zm7.16-7.234c.101.05.156.05.261.105.106.051.262.051.422.106 1.211.312 2.157.312 2.895.105.683-.265 1.105-.734 1.316-1.574.156-.734 0-1.363-.422-1.887-.421-.523-1.054-.945-1.949-1.152-.578-.16-1.05-.105-1.262.05-.261.212-.472.68-.632 1.47l-.579 2.777zm16.21 3.773c.106 0 .157.055.262.055s.211.05.422.05c1.156.157 2.106.056 2.735-.312.632-.367 1.004-.996 1.105-1.886.106-.79-.101-1.47-.523-1.993-.422-.527-1.106-.84-1.95-.945-.578-.05-.945 0-1.21.211-.211.207-.368.734-.473 1.52zm3.157-6.761c1.844.261 3.21.84 4.055 1.73.84.89 1.21 2.098 1 3.617-.16 1.47-.739 2.516-1.739 3.145s-2.367.789-4.156.578l-2.582-.367-.156 1.574c-.16 1.203-.106 1.992.105 2.36.211.363.633.574 1.262.68l-.211 1.886-7.05-.942.21-1.89c.684.054 1.106-.051 1.367-.367.262-.313.473-1.047.633-2.254l.684-5.871c.156-1.203.105-1.993-.055-2.36-.21-.367-.629-.574-1.262-.734l.211-1.887 7.79 1.05zm10.21 8.18c.056 1.937.423 3.46 1.106 4.507.684 1.047 1.633 1.52 2.844 1.469 1.211-.055 2.106-.629 2.734-1.68.633-1.101.895-2.62.844-4.558-.05-1.942-.422-3.461-1.156-4.512-.688-1.047-1.633-1.52-2.844-1.465-1.21.05-2.105.629-2.738 1.676-.629 1.101-.895 2.621-.84 4.562zm-4 .156c-.05-2.41.579-4.403 1.95-5.926 1.367-1.52 3.211-2.36 5.523-2.41 2.317-.106 4.211.578 5.739 1.992 1.472 1.414 2.265 3.355 2.37 5.766.052 2.414-.581 4.406-1.948 5.925-1.368 1.52-3.262 2.36-5.578 2.41-2.317.106-4.211-.574-5.688-1.992-1.473-1.414-2.262-3.355-2.312-5.765zm18.423 6.972-.317-1.836c.633-.156 1.055-.418 1.211-.785.16-.367.16-1.152-.05-2.36l-.95-5.82c-.21-1.203-.422-1.937-.734-2.253-.266-.262-.738-.368-1.422-.262l-.316-1.836 7.894-1.465c1.895-.367 3.367-.266 4.422.207 1.05.524 1.684 1.469 1.945 2.832.16 1.047.055 1.887-.367 2.672-.422.734-1.105 1.418-2.105 1.941l3.37 3.305c.419.418.84.68 1.208.836.37.16.793.211 1.265.16l.317 1.832-4.477.84-5.422-5.766-1.207.208.313 1.89c.21 1.203.422 1.938.738 2.2.262.261.738.367 1.422.261l.316 1.887-7 1.312zm3.949-9.644c.105 0 .21 0 .262-.055.105 0 .261-.05.422-.05 1.261-.212 2.156-.63 2.683-1.102.527-.524.738-1.153.633-1.992-.106-.735-.473-1.258-1.055-1.575-.578-.312-1.316-.418-2.21-.261-.63.105-1 .316-1.157.578s-.21.836-.055 1.625l.477 2.777zm18.262 4.715-5.735 2.097-.582-1.781c.895-.473 1.422-1.574 1.528-3.25v-.105l.683-11.797 3.055-1.153 7.367 9.383c.578.684 1 1.102 1.316 1.258.317.16.739.16 1.266.055l.578 1.78-6.738 2.466-.578-1.73.156-.052c.473-.16.844-.367 1-.578.16-.21.211-.472.106-.785-.051-.105-.051-.21-.157-.316-.054-.106-.105-.207-.21-.262l-1.368-1.73-4.37 1.625.054 2.203c0 .156 0 .21.05.312 0 .055.055.16.055.211a.94.94 0 0 0 .63.63c.316.054.737 0 1.265-.157l.578 1.73zm-2.418-6.973 2.945-1.098-2.738-3.828-.207 4.875zm12.05-11.008-.261.106c-.79.367-1.371.89-1.79 1.625-.37.734-.632 1.73-.687 2.988l-1.523.05-.266-5.03 10.899-4.93 3.21 3.672-1.105 1.101c-.898-.84-1.687-1.363-2.477-1.523-.734-.207-1.527-.102-2.316.21l-.262.106 3.106 7.918c.422 1.098.844 1.781 1.156 1.992.316.207.793.207 1.422-.054l.684 1.73-6.579 2.988-.683-1.73c.578-.313.945-.629 1.05-1.047.106-.422-.105-1.156-.523-2.309l-3.105-7.914zm16.317-11.586.95 1.574c-.528.368-.845.786-.845 1.204-.05.421.266 1.156.844 2.203l2.945 5.03c.582 1.052 1.106 1.626 1.422 1.786.367.156.844.05 1.367-.316l.95 1.625-6 4.039-.95-1.625c.528-.367.844-.79.844-1.207.051-.418-.262-1.153-.894-2.149l-2.95-5.035c-.628-1.047-1.105-1.676-1.472-1.781-.367-.156-.79-.05-1.367.312l-.95-1.57 6-4.039zm8.687 2.988c1.157 1.52 2.313 2.465 3.418 2.883 1.16.368 2.16.157 3.106-.629.949-.785 1.316-1.836 1.21-3.144-.105-1.258-.734-2.676-1.894-4.195-1.156-1.52-2.262-2.465-3.422-2.832-1.156-.368-2.156-.157-3.105.628-.945.79-1.317 1.836-1.211 3.094.105 1.258.738 2.676 1.898 4.196zm-3.105 2.727c-1.422-1.887-2.004-3.879-1.793-5.976.266-2.098 1.266-3.934 3.055-5.504 1.789-1.575 3.683-2.254 5.683-2.098s3.684 1.207 5.106 3.094c1.422 1.886 2 3.879 1.738 5.976-.266 2.149-1.266 3.985-3.055 5.555-1.789 1.574-3.683 2.254-5.683 2.047-2-.211-3.684-1.207-5.106-3.094zm18.894-6.031-1.316-1.258c.422-.574.578-1.047.527-1.414-.054-.418-.527-.996-1.37-1.836l-4.106-3.984c-.84-.836-1.473-1.258-1.84-1.309-.371-.055-.79.207-1.266.734l-1.312-1.257 4.105-4.88 9.418 1.942-2.84-2.726c-.843-.84-1.472-1.258-1.843-1.258-.368-.051-.79.21-1.262.734l-1.266-1.207 3.582-4.246 1.317 1.258c-.422.523-.582.996-.528 1.418.051.418.528.996 1.422 1.832l7.422 7.133-1.793 2.093-12.734-2.566 4.945 4.77c.844.84 1.473 1.257 1.844 1.312.367.05.789-.211 1.262-.734l1.265 1.257-3.582 4.246zm14.579-32.238c1.578.94 3 1.363 4.16 1.257 1.156-.105 2.05-.683 2.629-1.836.582-1.101.582-2.254.054-3.406-.578-1.156-1.632-2.152-3.21-3.148-1.579-.942-3-1.364-4.16-1.258-1.208.105-2.052.734-2.63 1.836-.578 1.101-.578 2.254-.054 3.355.527 1.102 1.632 2.149 3.21 3.094zm-1.946 3.773c-1.949-1.152-3.21-2.777-3.738-4.824-.527-2.043-.211-4.192.894-6.344 1.106-2.2 2.633-3.563 4.528-4.191 1.894-.63 3.84-.368 5.789.785 1.95 1.152 3.21 2.777 3.738 4.875.524 2.043.211 4.195-.894 6.394-1.106 2.203-2.633 3.567-4.528 4.196-1.894.629-3.843.367-5.789-.84zm8-21.914.156-.524c.211-.734.266-1.312.055-1.68-.21-.366-.738-.734-1.582-1.046l.477-1.52 6.367 2.2-.473 1.523c-.844-.16-1.472-.16-1.949.05-.473.212-.789.579-.945 1.208l-.16.523 2.265.785c1.106.368 1.79.473 2.156.368.372-.157.684-.524.895-1.207l1.684.578-2.207 7.234-1.688-.574c.16-.684.16-1.207-.05-1.524-.212-.312-.895-.68-1.95-1.046l-5.262-1.836c-1.105-.368-1.789-.524-2.16-.368-.367.106-.683.524-.894 1.207l-1.684-.578 3.578-11.793 4.528-.632.265 1.574c-1.16.367-2.16.89-2.894 1.574a5.836 5.836 0 0 0 -1.633 2.621c-.211.68-.211 1.152-.106 1.414.157.317.578.578 1.317.84l1.894.68zm9.895-33.867.949-1.836c1.418.89 2.473 1.941 3.156 3.199s1 2.621.895 4.14a8.244 8.244 0 0 1 -.738 2.989c-.418.996-.946 1.785-1.63 2.465a7.24 7.24 0 0 1 -2.581 1.676c-.946.316-2 .472-3.207.367-1.16-.102-2.211-.367-3.106-.836-.898-.473-1.687-1.156-2.371-2.047-.527-.734-.945-1.52-1.211-2.41a8.295 8.295 0 0 1 -.316-2.778c.054-.578.16-1.156.316-1.73.211-.578.422-1.102.79-1.68l-.79-.312.106-1.364 5.37-1.52.419 1.727c-1.262.473-2.313 1.102-3.051 1.891-.738.785-1.16 1.625-1.211 2.567-.055 1.152.367 2.148 1.316 2.937.946.785 2.262 1.203 4 1.363 1.739.106 3.106-.16 4.106-.789 1-.68 1.578-1.625 1.633-2.883.05-.89-.16-1.78-.688-2.726-.523-.942-1.262-1.676-2.207-2.36zm5.156-4.09-1.734.156c-.106-.73-.317-1.152-.633-1.36-.317-.21-1.05-.265-2.211-.16l-5.527.524c-1.157.106-1.84.316-2.157.578-.261.262-.422.785-.367 1.469l-1.738.156-.633-7.601 1.684-.157c.105.68.265 1.153.632 1.364.317.207 1.055.261 2.211.156l1.422-.156-.472-5.664-1.422.16c-1.16.101-1.844.312-2.16.574-.262.262-.418.789-.368 1.469l-1.683.156-.633-7.602 1.738-.156c.106.68.262 1.152.63 1.363.316.211 1.054.262 2.21.157l5.527-.524c1.16-.105 1.844-.316 2.16-.578.262-.262.419-.785.368-1.465l1.738-.16.629 7.602-1.734.16c-.106-.684-.266-1.156-.633-1.363-.317-.211-1.051-.262-2.211-.16l-2.422.21.477 5.664 2.417-.21c1.16-.106 1.844-.317 2.106-.579.266-.261.422-.785.371-1.468l1.734-.157.633 7.602zm-17.629-23.59 1.684-.473c.156.68.422 1.102.789 1.258s1.105.106 2.21-.21l5.368-1.415c1.105-.312 1.789-.578 2-.945.266-.313.316-.836.16-1.52l1.734-.472 1.739 7.394-1.739.473c-.156-.684-.421-1.102-.789-1.258-.367-.16-1.105-.105-2.21.207l-5.368 1.418c-1.105.313-1.789.629-2.054.941-.262.317-.262.84-.157 1.52l-1.683.473-1.739-7.391zm12.945-8.598-1.628.68c-.266-.629-.583-1.047-.95-1.152-.367-.106-1.105.05-2.156.523l-5.16 2.203c-1.05.473-1.684.84-1.895 1.207-.21.364-.21.836.051 1.52l-1.629.68-2.265-6.082 5.738-8.231-3.527 1.52c-1.051.472-1.684.84-1.895 1.207-.21.367-.156.84.055 1.52l-1.582.683-2-5.297 1.632-.68c.262.63.579.996.95 1.102.367.105 1.105-.055 2.156-.528l9.266-3.98 1 2.672-7.739 11.113 6.211-2.672c1.051-.472 1.684-.89 1.895-1.207.21-.367.156-.84-.055-1.52l1.582-.683 2 5.297zm-9-21.863 2.95 5.664-1.528.942c-.578-.891-1.683-1.258-3.261-1.047h-.106l-10.95 1.308-1.577-3.039 7.316-9.437c.524-.735.84-1.258.946-1.625.054-.367 0-.785-.211-1.309l1.527-.894 3.473 6.66-1.524.89-.055-.156c-.261-.473-.472-.789-.683-.945s-.473-.156-.738 0a.955.955 0 0 0 -.262.21c-.106.052-.16.157-.211.262l-1.367 1.73 2.21 4.298 2.051-.469c.106-.055.211-.055.262-.105.055 0 .106-.055.16-.106.317-.156.422-.418.473-.734 0-.313-.106-.785-.367-1.309l1.527-.894zm-6 3.777-1.472-2.886-3.055 3.566 4.527-.629zm0 0"/>
+          </g>
+        </g>
+      </svg>
+    </div>
+    <div>
+      <div class="logo-text">国网人资舆情筛查系统</div>
+      <div class="logo-sub">SGCC HR SENTIMENT MONITOR</div>
+    </div>
+  </div>
+  <div class="topbar-divider"></div>
+  <div id="topbarStatus" class="badge badge-default">
+    <span class="dot dot-gray"></span> 等待上传
+  </div>
+  <div class="topbar-divider"></div>
+  <nav class="main-tabs" id="topbarTabs">
+    <div class="main-tab active" data-tab="home">🏠 系统首页</div>
+    <div class="main-tab" data-tab="config">⚙️ 识别配置</div>
+    <div class="main-tab" data-tab="lexicon">📖 词库管理</div>
+    <div class="main-tab" data-tab="result">📋 识别结果</div>
+    <div class="main-tab" data-tab="log">🗒️ 运行日志</div>
+    <div class="main-tab" data-tab="mapping">📑 字段映射</div>
+    <div class="main-tab" data-tab="extract">🔍 内容解析</div>
+  </nav>
+  <div class="topbar-actions">
+    <button class="btn btn-ghost btn-sm" id="topImportBtn">⬆ 导入文件</button>
+    <button class="btn btn-primary btn-sm" id="topExportBtn" disabled>⬇ 导出结果</button>
+  </div>
+</div>
+
+<!-- 主布局 -->
+<div class="layout">
+
+  <!-- 左侧边栏 -->
+  <div class="sidebar">
+
+    <!-- 文件上传 -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">数据文件</div>
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="fileInput" accept=".xlsx">
+        <div class="upload-icon">📊</div>
+        <div class="upload-text">
+          <strong>点击上传</strong> 或拖拽文件至此<br>
+          支持 .xlsx 格式
+        </div>
+      </div>
+      <div id="fileInfoBlock" style="margin-top:10px; display:none;">
+        <div class="file-info">
+          <div class="file-info-name" id="fileInfoName"></div>
+          <div class="file-info-meta" id="fileInfoMeta"></div>
+        </div>
+        <div class="sheet-select-wrap" id="sheetSelectWrap" style="display:none;">
+          <label>选择工作表（Sheet）</label>
+          <select id="sheetSelect"></select>
+        </div>
+      </div>
+    </div>
+
+    <!-- 识别模式 -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">识别模式</div>
+      <div class="mode-tabs">
+        <div class="mode-tab active" data-mode="local" id="modeLocal">
+          <div style="font-size:18px">📦</div>
+          <div>本地模式</div>
+        </div>
+        <div class="mode-tab" data-mode="ai" id="modeAI">
+          <div style="font-size:18px">🤖</div>
+          <div>AI 模式</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 执行控制 -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">执行控制</div>
+      <button class="btn btn-primary" id="startBtn" disabled style="width:100%; justify-content:center; padding:10px;">
+        ⚡ 开始识别
+      </button>
+      <button class="btn btn-danger btn-sm" id="stopBtn" style="width:100%; justify-content:center; margin-top:8px; display:none;">
+        ■ 中止
+      </button>
+      <div class="progress-wrap" id="progressWrap" style="display:none;">
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="progressFill"></div>
+        </div>
+        <div class="progress-text">
+          <span id="progressInfo">准备中...</span>
+          <span id="progressPct">0%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 统计 -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">识别统计</div>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-num" id="statTotal">0</div>
+          <div class="stat-label">扫描行数</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num danger" id="statMarked">0</div>
+          <div class="stat-label">本地标记</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num warn" id="statAI">0</div>
+          <div class="stat-label">AI 确认</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num success" id="statTime">-</div>
+          <div class="stat-label">耗时(s)</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-info-card">
+      <div class="info-card-group">
+        <div class="info-card-label">在线地址</div>
+        <div class="info-card-url-wrapper">
+          <a href="https://sgccyuqing.ccwu.cc" target="_blank" class="info-card-url">
+            <span>🌐</span> sgccyuqing.ccwu.cc
+          </a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 主内容 -->
+  <div class="main">
+    <div class="main-content">
+
+      <!-- ── Tab: 系统首页 ── -->
+      <div class="tab-pane active" id="tab-home">
+
+        <div class="panel hero-panel" style="text-align: center; padding: 125px 24px 125px;">
+          <h1 style="font-size: 24px; color: var(--text); font-weight: 700; letter-spacing: 1px; margin-bottom: 32px;">欢迎使用 国网人资舆情筛查系统</h1>
+          <button class="btn btn-primary" onclick="document.querySelector('.main-tab[data-tab=\'config\']').click()" style="padding: 12px 32px; font-size: 15px;">
+            开始配置并使用
+          </button>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">
+            <div class="icon">🛤️</div>
+            使用操作流程
+          </div>
+          <div class="workflow-grid">
+            <div class="workflow-step">
+              <div class="step-num">01</div>
+              <div class="step-icon">📤</div>
+              <div class="step-title">导入数据</div>
+              <div class="step-desc">在左侧边栏上传 .xlsx 格式的舆情原始数据表</div>
+            </div>
+            <div class="workflow-step">
+              <div class="step-num">02</div>
+              <div class="step-icon">⚙️</div>
+              <div class="step-title">规则配置</div>
+              <div class="step-desc">选择本地/AI模式，调整识别阈值或自定义映射列</div>
+            </div>
+            <div class="workflow-step">
+              <div class="step-num">03</div>
+              <div class="step-icon">⚡</div>
+              <div class="step-title">执行扫描</div>
+              <div class="step-desc">点击开始识别，系统将并发处理并实时显示进度</div>
+            </div>
+            <div class="workflow-step">
+              <div class="step-num">04</div>
+              <div class="step-icon">📊</div>
+              <div class="step-title">导出结果</div>
+              <div class="step-desc">预览负面数据，并导出带有三色关键词高亮的报表</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ── Tab: 识别配置 ── -->
+      <div class="tab-pane" id="tab-config">
+
+        <!-- 本地模式配置 -->
+        <div class="panel" id="localConfigPanel">
+          <div class="panel-title">
+            <div class="icon">📦</div>
+            本地识别配置
+          </div>
+
+          <div class="form-row" style="gap:16px; align-items:flex-start; flex-wrap:wrap;">
+            <div style="flex:1; min-width:260px;">
+              <div style="font-size:12px; color:var(--text2); margin-bottom:8px;">
+                负面情感判定阈值（越低越宽松）
+              </div>
+              <div class="threshold-row">
+                <div class="slider-wrap">
+                  <div class="slider-scale"><span>宽松 · 多召回</span><span>严格 · 高精准</span></div>
+                  <input type="range" id="thresholdSlider" min="0.01" max="0.5" step="0.01" value="0.08" style="--pct:16%;">
+                </div>
+                <div class="threshold-val" id="thresholdVal">0.08</div>
+              </div>
+            </div>
+            <div style="flex:1; min-width:200px;">
+              <div style="font-size:12px; color:var(--text2); margin-bottom:8px;">
+                必须包含实体词（国网主体）
+              </div>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text);">
+                <input type="checkbox" id="requireEntity" checked
+                  style="width:14px;height:14px;accent-color:var(--accent);">
+                开启实体词前置过滤
+              </label>
+              <div style="font-size:12px; color:var(--text2); margin:12px 0 6px;">
+                弱实体邻近共现距离（字）
+                <span style="color:var(--text3);">— 0 为关闭，越小越严</span>
+              </div>
+              <input type="number" id="proximityInput" value="30" min="0" max="500" step="5"
+                style="width:110px;padding:6px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;">
+            </div>
+          </div>
+
+          <div class="info-box" style="margin-top:14px;">
+            🔍 本地模式需「实体词 + 领域词 + 负面情感词」同时命中（实体词门槛可在上方开关关闭）。
+            <br>· <strong>强实体</strong>（国家电网/国网XX/南瑞等具名主体）出现即确认主体；
+            <strong>弱实体</strong>（供电局、省电力、国电等泛词）须与领域词在设定字数内<strong>邻近共现</strong>，以减少误触。
+            <br>· 对「标题/微博内容」「摘要」两字段独立判断，任一字段命中即标记该行。
+            命中关键词变<strong style="color:var(--danger)">红色字体</strong>；对应行 B 列填入<strong>「是」</strong>（本地黑色 / AI确认红色）。
+          </div>
+        </div>
+
+        <!-- AI 模式配置 -->
+        <div class="panel" id="aiConfigPanel" style="display:none;">
+          <div class="panel-title">
+            <div class="icon">🤖</div>
+            AI 模型配置
+          </div>
+
+          <!-- 已配置模型列表 -->
+          <div class="model-list" id="modelList"></div>
+
+          <div style="margin-top:12px; display:flex; gap:8px;">
+            <button class="btn btn-secondary btn-sm" id="addModelBtn">＋ 添加模型</button>
+          </div>
+
+          <!-- 选中模型的 Key 配置 -->
+          <div class="divider"></div>
+          <div id="selectedModelConfig">
+            <div style="font-size:12px; color:var(--text2); margin-bottom:10px;">当前模型 API Key</div>
+            <div class="form-row">
+              <input type="password" id="apiKeyInput" placeholder="填写 API Key...">
+              <button class="btn btn-secondary btn-sm" id="testKeyBtn">测试</button>
+              <button class="btn btn-primary btn-sm" id="saveKeyBtn">保存</button>
+              <span id="keyStatus" class="badge badge-default">未验证</span>
+            </div>
+
+            <!-- 性能：并发 + 多Key轮询 -->
+            <div class="form-row" style="margin-top:14px; gap:16px; align-items:flex-start; flex-wrap:wrap;">
+              <div style="flex:0 0 auto;">
+                <div style="font-size:12px; color:var(--text2); margin-bottom:6px;">并发请求数</div>
+                <input type="number" id="concurrencyInput" value="8" min="1" max="32" step="1"
+                  style="width:90px;padding:6px 8px;background:var(--surface3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;">
+                <div style="font-size:10px;color:var(--text3);margin-top:4px;">同时在途请求数，越大越快（受 API 限速约束），默认 8</div>
+              </div>
+              <div style="flex:1; min-width:220px;">
+                <div style="font-size:12px; color:var(--text2); margin-bottom:6px;">
+                  额外 API Key（可选，每行一个）
+                </div>
+                <textarea id="extraKeysInput" spellcheck="false"
+                  style="width:100%;height:64px;background:var(--surface3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:11px;padding:6px 8px;resize:vertical;outline:none;font-family:'Microsoft YaHei',monospace;line-height:1.6;"
+                  placeholder="填入更多 Key 可轮询使用，叠加限速上限、进一步提速&#10;不填则仅用上方主 Key"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <div class="info-box" style="margin-top:14px;">
+            🤖 AI 模式将先运行本地模式完成全量扫描，再将<strong>本地标记为「是」的行</strong>发送给 LLM 二次核验（<strong>并发执行</strong>，速度大幅提升，判定结果与逐条一致）。
+            LLM 确认为负面的行，B 列「是」字体改为<strong style="color:var(--danger)">红色</strong>；LLM 认为非负面的，不移除本地标记。
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ── Tab: 词库管理 ── -->
+      <div class="tab-pane" id="tab-lexicon">
+        <div class="panel">
+          <div class="panel-title">
+            <div class="icon">📖</div>
+            词库管理
+            <span style="font-size:11px; color:var(--text3); font-weight:400; margin-left:8px;">每行一个词，修改后自动生效</span>
+          </div>
+          <div class="lexicon-grid">
+            <div class="lexicon-card">
+              <div class="lexicon-card-head">
+                <div class="lexicon-card-title entity">🏢 实体词库</div>
+                <div class="lexicon-count" id="entityCount">0 词</div>
+              </div>
+              <div class="lexicon-hl-wrap">
+                <div class="lexicon-hl-backdrop" id="entityBackdrop"></div>
+                <textarea class="lexicon-textarea lexicon-textarea-hl" id="entityTextarea" spellcheck="false"></textarea>
+              </div>
+              <div style="font-size:11px;color:var(--text3);margin-top:6px;line-height:1.6;">
+                <span style="color:#34d399;">●强实体</span>（含「国网/国家电网」、具名子公司、或≥5字）出现即确认主体；<br>
+                <span style="color:#fbbf24;">●弱实体</span>（其余泛词，如供电局/省电力）须与领域词邻近共现。
+              </div>
+              <div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);">
+                <div style="font-size:11px;color:#34d399;font-weight:600;margin-bottom:4px;">⭐ 强实体豁免词</div>
+                <div style="font-size:10px;color:var(--text3);margin-bottom:6px;line-height:1.5;">
+                  填入此处的词将<strong style="color:#34d399;">强制判为强实体</strong>，绕过常规规则（每行一个）。<br>
+                  适用于不含「国网」、又不足5字、但确属国网主体的短简称（如 冀电）。
+                </div>
+                <textarea class="lexicon-textarea" id="exemptTextarea" spellcheck="false"
+                  style="height:80px;min-height:80px;flex:0 0 auto;" placeholder="例如：&#10;冀电&#10;蒙东"></textarea>
+              </div>
+            </div>
+            <div class="lexicon-card">
+              <div class="lexicon-card-head">
+                <div class="lexicon-card-title domain">🏷 领域词库</div>
+                <div class="lexicon-count" id="domainCount">0 词</div>
+              </div>
+              <textarea class="lexicon-textarea" id="domainTextarea"></textarea>
+              <div style="font-size:11px;color:var(--text3);margin-top:6px;">招聘·薪酬·劳动关系词</div>
+            </div>
+            <div class="lexicon-card">
+              <div class="lexicon-card-head">
+                <div class="lexicon-card-title negative">⚠ 负面情感词库</div>
+                <div class="lexicon-count" id="negCount">0 词</div>
+              </div>
+              <textarea class="lexicon-textarea" id="negTextarea"></textarea>
+              <div style="font-size:11px;color:var(--text3);margin-top:6px;">负面情感·行为·评价词</div>
+            </div>
+          </div>
+          <div style="margin-top:14px; display:flex; gap:8px; align-items:center;">
+            <button class="btn btn-primary btn-sm" id="confirmLexiconBtn">✓ 确认词库修改</button>
+            <button class="btn btn-secondary btn-sm" id="resetLexiconBtn">↺ 恢复默认词库</button>
+            <span id="lexiconFeedback" style="font-size:13px;color:var(--success);display:none;">✓ 词库已更新</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Tab: 识别结果 ── -->
+      <div class="tab-pane" id="tab-result">
+        <div class="panel">
+          <div class="panel-title">
+            <div class="icon">📋</div>
+            识别结果预览
+            <span style="font-size:11px; color:var(--text3); font-weight:400; margin-left:8px;">仅展示被标记为负面的行</span>
+          </div>
+          <div class="toolbar" style="margin-bottom:12px;">
+            <span class="badge badge-danger" id="resultCount">0 条负面</span>
+            <span class="badge badge-warn" id="resultAICount" style="display:none;">0 条 AI 确认</span>
+          </div>
+          <div id="previewWrap">
+            <div class="empty-state">
+              <div class="emoji">🔎</div>
+              <p>识别完成后，结果将展示在这里<br>仅显示被标记为负面舆情的数据行</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Tab: 运行日志 ── -->
+      <div class="tab-pane" id="tab-log">
+        <div class="panel">
+          <div class="panel-title">
+            <div class="icon">🗒️</div>
+            运行日志
+          </div>
+          <div class="toolbar" style="margin-bottom:12px;">
+            <button class="btn btn-ghost btn-sm" id="clearLogBtn">清空日志</button>
+          </div>
+          <div class="log-container" id="logPanel"></div>
+        </div>
+      </div>
+
+      <div class="tab-pane" id="tab-mapping">
+        <div class="panel">
+          <div class="panel-title">
+            <div class="icon">📑</div>
+            自定义分析列映射
+            <span style="font-size:11px; color:var(--text3); font-weight:400; margin-left:8px;">不选择则默认使用系统内置规则</span>
+          </div>
+
+          <div class="info-box" style="margin-bottom:16px;">
+            💡 <strong>系统默认逻辑：</strong>自动寻找列名包含「标题/微博内容」或「摘要」的列进行扫描。<br>
+            如果您的表格表头不符合默认规则，请在下方下拉框中指定需要分析的列。<strong>只要您在此处进行了任何选择，系统将优先只分析您选择的列。</strong>
+          </div>
+
+          <div id="mappingContainer" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px 40px; max-width: 860px;">
+            <div style="color:var(--text3); font-size:12px; grid-column: 1 / -1;">请先在左侧上传 Excel 文件...</div>
+          </div>
+
+          <div style="margin-top: 20px; max-width: 860px; display: flex;">
+            <button class="btn btn-ghost btn-sm" id="addMappingBtn" style="display: none; width: 100%; border: 1px dashed var(--border); justify-content: center; color: var(--text2);">
+              ＋ 添加分析列
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Tab: 内容解析 ── -->
+      <div class="tab-pane" id="tab-extract">
+        <div class="panel">
+          <div class="panel-title">
+            <div class="icon">🔍</div>
+            URL 内容解析
+            <span style="font-size:11px; color:var(--text3); font-weight:400; margin-left:8px;">从原始数据中的链接自动提取网页文字</span>
+          </div>
+
+          <!-- web 端提示 -->
+          <div id="extractWebNotice" style="display:none; text-align:center; padding:80px 24px;">
+            <div style="font-size:48px; margin-bottom:20px;">🔒</div>
+            <div style="font-size:16px; color:var(--text2); font-weight:500;">网页端暂未开放，请通过桌面端使用</div>
+          </div>
+
+          <!-- exe 端功能区 -->
+          <div id="extractMainArea">
+            <div class="info-box" style="margin-bottom:16px;">
+              💡 系统将自动访问链接并提取页面文字内容。遇到需登录的网站时会弹出窗口供您登录。<br>
+              提取结果将写入每行固定新增列「抓取原文」中。请先在左侧上传 Excel 文件。
+            </div>
+
+            <div style="max-width:400px; margin-bottom:16px;">
+              <div style="font-size:12px; color:var(--text2); margin-bottom:8px;">选择包含 URL 的列</div>
+              <select id="extractColSelect" style="width:100%; padding:8px 12px; background:var(--surface3); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:13px; outline:none;">
+                <option value="">-- 请先上传 Excel 文件 --</option>
+              </select>
+            </div>
+
+            <div style="max-width:400px; margin-bottom:20px;">
+              <div style="font-size:12px; color:var(--text2); margin-bottom:8px;">并发请求数</div>
+              <div style="display:flex; align-items:center; gap:12px;">
+                <input type="range" id="extractConcurrency" min="5" max="50" value="20" style="flex:1; --pct:33%;">
+                <span id="extractConcurrencyVal" style="font-size:13px; color:var(--text); min-width:30px;">20</span>
+              </div>
+              <div style="font-size:10px; color:var(--text3); margin-top:4px;">同时发起的网络请求数，越大越快（受目标网站限流约束）</div>
+            </div>
+
+            <button class="btn btn-primary" id="extractStartBtn" disabled>开始解析</button>
+
+            <div id="extractProgressWrap" style="display:none; margin-top:20px;">
+              <div class="progress-bar-bg">
+                <div class="progress-bar-fill" id="extractProgressFill"></div>
+              </div>
+              <div style="display:flex; justify-content:space-between; margin-top:8px;">
+                <span id="extractProgressInfo" style="font-size:12px; color:var(--text2);"></span>
+                <span id="extractProgressPct" style="font-size:12px; color:var(--accent);"></span>
+              </div>
+              <div style="display:flex; gap:20px; margin-top:12px; font-size:12px;">
+                <span style="color:var(--success);">✅ 成功: <b id="extractStatSuccess">0</b></span>
+                <span style="color:var(--warn);">⚠️ 需登录: <b id="extractStatLogin">0</b></span>
+                <span style="color:var(--danger);">❌ 失败: <b id="extractStatFail">0</b></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- 添加模型弹窗 -->
+<div class="modal-overlay" id="addModelModal">
+  <div class="modal">
+    <div class="modal-title">添加自定义模型</div>
+    <div class="form-row" style="margin-bottom:12px;">
+      <div class="form-label">模型名称</div>
+      <input type="text" id="newModelName" placeholder="如：GPT-4o">
+    </div>
+    <div class="form-row" style="margin-bottom:12px;">
+      <div class="form-label">API 端点</div>
+      <input type="url" id="newModelUrl" placeholder="如：https://api.openai.com/v1">
+    </div>
+    <div class="form-row" style="margin-bottom:12px;">
+      <div class="form-label">模型 ID</div>
+      <input type="text" id="newModelId" placeholder="如：gpt-4o">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="cancelModelBtn">取消</button>
+      <button class="btn btn-primary" id="confirmModelBtn">添加</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+'use strict';
+
+// ═══════════════════════════════════════════
+//  词库
+// ═══════════════════════════════════════════
+const DEFAULT_ENTITIES = `国家电网
+国网
+供电公司
+省电力
+市电力
+县电力
+供电局
+电业局
+电力公司
+电网公司
+国电
+南瑞
+许继
+平高
+山东电工
+新源
+英大
+中电装备
+供电所
+农电
+电科院
+经研院
+送变电
+检修公司
+国网人资部
+国网组织部
+国网工会
+国网监察局
+国网审计部
+国网法律部
+国网党校
+国网技术学院
+国网大数据中心
+国网互联网部
+国网物资公司
+国网客服中心
+国网电动汽车
+国网电商
+国网综合能源
+国网信通
+国网英大
+国网财务公司
+国网租赁
+国网保险
+国网产业单位
+省公司
+市公司
+县公司
+供电服务中心
+客户服务中心
+变电运维
+输电运检
+配电运检
+营销部
+调度中心
+信通公司
+建设部
+发展部
+财务部
+安监部
+党建部
+宣传部
+离退部
+集体企业
+三产公司
+农电公司
+农服公司
+阳光公司
+供服公司
+直签工
+集体工
+劳务工
+外包人员
+借调人员
+挂职人员
+国网总部
+冀北电力
+国网浙江
+国网江苏
+国网山东
+国网福建
+国网安徽
+国网河南
+国网湖南
+国网湖北
+国网四川
+国网陕西
+国网甘肃
+国网新疆
+国网西藏
+国网青海
+国网宁夏
+国网东北
+国网辽宁
+国网吉林
+国网黑龙江
+国网北京
+国网天津
+国网河北
+国网山西
+国网内蒙古
+电力人
+网格员
+客服员工
+一线班组
+基层员工`;
+
+const DEFAULT_DOMAIN = `工资
+发钱
+年终奖
+奖金
+薪酬
+薪资
+年薪
+公积金
+福利
+待遇
+绩效
+高薪
+收入
+降薪
+农电工
+疗养
+负责人
+董事长
+书记
+高管
+高层
+医保
+招聘
+校招
+录用
+录取
+笔试
+面试
+考试
+简历
+毕业生
+大学生
+公示
+批次
+关系户
+子弟
+内定
+萝卜
+作弊
+公平
+公告
+公正
+宣讲
+网申
+萝卜岗
+走后门
+同工不同酬
+劳务派遣
+外包
+临时工
+合同工
+编制
+转正
+升职
+五险一金
+六险二金
+社保
+加班费
+夜班补贴
+高温补贴
+取暖费
+餐补
+交通补贴
+通讯补贴
+住房补贴
+企业年金
+补充医疗保险
+季度奖
+年终兑现
+目标奖
+专项奖
+安全奖
+全勤奖
+提成
+计件工资
+基本工资
+岗位工资
+工龄工资
+职称津贴
+值班费
+过节费
+防暑降温费
+洗理费
+劳保费
+辞退补偿
+经济补偿金
+网申截止
+资格审查
+资格初审
+资格复审
+体测
+体检
+政审
+背调
+公示期
+拟录用
+递补
+调剂
+签约
+三方协议
+劳动合同
+试用期
+见习期
+轮岗
+定向招聘
+社会招聘
+内部招聘
+竞聘
+调剂志愿
+服从调剂
+笔试成绩
+面试成绩
+综合成绩
+排名
+入围
+上岸
+国网一批
+国网二批
+提前批
+统考
+调剂公告
+人资部
+HR
+招聘专员
+面试官
+考务人员
+纪检组
+工会
+申诉渠道
+劳务公司
+派遣公司
+外包公司
+省公司
+市局
+县局
+基层单位
+离职
+辞职
+劝退
+裁员
+优化
+末位淘汰
+待岗
+调岗
+降职
+免职
+处分
+宣讲会
+双选会
+笔试大纲
+面试公告
+体检标准
+政审表
+背景调查
+入职手续
+报到证
+派遣证
+违约
+解约
+离职率
+流失率
+定岗定编
+岗位竞聘
+职级晋升
+职称评审
+技能鉴定
+培训
+轮训
+挂职
+借调
+跟班学习
+师徒制
+年薪制
+协议工资
+项目工资
+包干
+系数
+档位
+薪级
+薪档
+调资
+套改
+劳动争议
+仲裁
+诉讼
+劳动监察
+投诉举报
+信访
+申诉
+复议`;
+
+const DEFAULT_NEG = `差
+烂
+坑
+垃圾
+黑
+暗箱
+不公
+歧视
+压榨
+克扣
+拖欠
+霸王
+腐败
+受贿
+贪污
+造假
+作弊
+违规
+潜规则
+血汗
+寒心
+愤怒
+维权
+投诉
+曝光
+陷阱
+骗
+忽悠
+套路
+欺负
+侮辱
+冷漠
+推诿
+刁难
+不作为
+低
+少
+缩水
+减少
+降低
+下调
+内定
+萝卜
+关系户
+走后门
+同工不同酬
+截留
+侵吞
+拖延
+不透明
+差距
+绩效不公
+福利取消
+不涨薪
+虚假承诺
+萝卜坑
+黑幕
+歧视
+不公平
+虚假
+毁约
+压价
+强制
+隐瞒
+过场
+无效
+极其
+严重
+十分
+非常
+特别
+简直
+太
+超
+巨
+爆
+炸裂
+崩溃
+无语
+离谱
+荒唐
+可笑
+恶心
+反胃
+窒息
+绝望
+委屈
+憋屈
+心酸
+心累
+失望
+寒心
+凉心
+伤心
+难过
+气愤
+恼火
+暴怒
+抑郁
+焦虑
+烦躁
+不爽
+不服
+不甘
+不平衡
+意难平
+耍赖
+抵赖
+赖账
+扯皮
+踢皮球
+打太极
+装死
+失联
+消失
+拖延症
+磨洋工
+敷衍了事
+应付差事
+走过场
+做样子
+表面功夫
+形式主义
+一刀切
+层层加码
+朝令夕改
+因人而异
+看人下菜
+双重标准
+暗箱操作
+黑箱操作
+幕后操作
+私下操作
+打招呼
+递条子
+托关系
+找门路
+落选
+淘汰
+出局
+刷掉
+不要
+拒绝
+退回
+驳回
+不予通过
+不予录用
+暂缓
+搁置
+石沉大海
+杳无音信
+没有下文
+不了了之
+背锅
+甩锅
+内卷
+躺平
+PUA
+画饼
+大饼
+毒打
+劝退
+恶心人
+不地道
+不厚道
+玩人
+折腾
+反复横跳
+摆烂
+穿小鞋
+打击报复
+边缘化
+架空
+冷暴力
+软裁员
+变相裁员
+地域黑
+学校歧视
+性别歧视
+已婚歧视
+未婚歧视
+生育歧视
+第一学历歧视
+关系网
+裙带
+派系
+圈子
+裙带关系
+官僚
+衙门作风
+门难进
+脸难看
+形式化
+做表面
+搞形式
+口头支票
+待遇滑坡
+奖金归零
+承诺不兑现
+空头支票
+白嫖
+套路深
+水深
+雷区
+踩坑
+避雷
+拉胯
+要命
+想骂人
+心寒到底
+凉透
+无语至极
+巨坑
+天坑
+劝退警告
+降薪
+欺骗
+压制
+侵权
+霸凌
+排挤
+孤立
+打压
+不平等
+不对等
+不合理
+乱扣
+乱罚
+随意克扣
+拖着不发
+欠薪
+黑心
+缺德
+没良心
+无耻
+可耻
+丢人
+糟糕
+太差
+极差
+非常差
+非常低
+收入低
+待遇低
+工资低
+薪资低
+不满意
+不合格
+不符合
+没有保障
+无保障`;
+
+// 复合负面短语（整体匹配加权更高）
+const COMPOUND_NEG = [
+  '同工不同酬', '暗箱操作', '黑箱操作', '走后门', '内定萝卜', '萝卜坑',
+  '不予录用', '不予通过', '毁约违约', '劳动争议', '投诉举报', '维权',
+  '克扣工资', '拖欠工资', '强制加班', '变相裁员', '软裁员',
+  '裙带关系', '关系户', '第一学历歧视', '性别歧视', '生育歧视',
+  '待遇滑坡', '奖金归零', '承诺不兑现', '空头支票', '朝令夕改',
+  '层层加码', '形式主义', '打击报复', '穿小鞋'
+];
+
+// ═══════════════════════════════════════════
+//  状态
+// ═══════════════════════════════════════════
+let wb = null;
+let currentSheetName = '';
+let originalFileName = '';
+let currentMode = 'local';
+let isRunning = false;
+let shouldStop = false;
+let resultRows = [];
+
+// 模型配置
+let models = [
+  { id: 'deepseek', name: 'DeepSeek Chat', url: 'https://api.deepseek.com/v1', modelId: 'deepseek-chat', builtin: true }
+];
+let activeModelId = 'deepseek';
+
+// ═══════════════════════════════════════════
+//  工具函数
+// ═══════════════════════════════════════════
+function $(id) { return document.getElementById(id); }
+
+function log(msg, type = '') {
+  const panel = $('logPanel');
+  const time = new Date().toTimeString().slice(0, 8);
+  const div = document.createElement('div');
+  div.className = 'log-line';
+  div.innerHTML = `<span class="log-time">${time}</span><span class="log-msg ${type}">${escHtml(msg)}</span>`;
+  panel.appendChild(div);
+  panel.scrollTop = panel.scrollHeight;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function setStatus(text, type = 'default') {
+  const el = $('topbarStatus');
+  el.className = `badge badge-${type}`;
+  const dotClass = type === 'success' ? 'dot-green' : type === 'danger' ? 'dot-red' : type === 'warn' ? 'dot-yellow' : 'dot-gray';
+  el.innerHTML = `<span class="dot ${dotClass}"></span> ${text}`;
+}
+
+function getLexicon(textarea) {
+  return textarea.value.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+}
+
+// 渲染实体词库强弱高亮背板：逐行按规则上色，保持与 textarea 完全对齐
+function renderEntityBackdrop() {
+  const ta = $('entityTextarea');
+  const bd = $('entityBackdrop');
+  if (!ta || !bd) return;
+  const lines = ta.value.split('\n');
+  let html = '';
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i];
+    const word = raw.trim();
+    if (word) {
+      const cls = isStrongEntity(word) ? 'ent-strong' : 'ent-weak';
+      // 保留行内前后空白，仅给词本身上色
+      const lead = raw.slice(0, raw.indexOf(word));
+      const tail = raw.slice(raw.indexOf(word) + word.length);
+      html += escHtml(lead) + `<span class="${cls}">` + escHtml(word) + '</span>' + escHtml(tail);
+    } else {
+      html += escHtml(raw);
+    }
+    if (i < lines.length - 1) html += '\n';
+  }
+  // 末尾补一个换行，避免最后一行裁切；与 textarea 行为一致
+  bd.innerHTML = html + '\n';
+  bd.scrollTop = ta.scrollTop;
+  bd.scrollLeft = ta.scrollLeft;
+}
+
+function updateLexiconCounts() {
+  refreshExemptSet();
+  const entities = getLexicon($('entityTextarea'));
+  $('entityCount').textContent = entities.length + ' 词';
+  $('domainCount').textContent = getLexicon($('domainTextarea')).length + ' 词';
+  $('negCount').textContent = getLexicon($('negTextarea')).length + ' 词';
+  // 实体强弱分类预览
+  let strong = 0;
+  for (const e of entities) { if (isStrongEntity(e)) strong++; }
+  const box = $('entityClassify');
+  if (box) {
+    box.style.display = entities.length ? '' : 'none';
+    $('strongCount').textContent = strong;
+    $('weakCount').textContent = entities.length - strong;
+  }
+  renderEntityBackdrop();
+}
+
+// ═══════════════════════════════════════════
+//  初始化词库
+// ═══════════════════════════════════════════
+function initLexicon() {
+  $('entityTextarea').value = DEFAULT_ENTITIES;
+  $('domainTextarea').value = DEFAULT_DOMAIN;
+  $('negTextarea').value = DEFAULT_NEG;
+  $('exemptTextarea').value = '';
+  updateLexiconCounts();
+}
+
+['entityTextarea', 'domainTextarea', 'negTextarea', 'exemptTextarea'].forEach(id => {
+  $(id).addEventListener('input', updateLexiconCounts);
+});
+// 实体词库滚动时同步背板
+$('entityTextarea').addEventListener('scroll', () => {
+  const ta = $('entityTextarea'), bd = $('entityBackdrop');
+  bd.scrollTop = ta.scrollTop; bd.scrollLeft = ta.scrollLeft;
+});
+
+// 确认词库修改：给出明确反馈并保存
+$('confirmLexiconBtn').addEventListener('click', () => {
+  updateLexiconCounts();
+  saveConfig(); // 点击确认时，不仅更新内存，还写入本地缓存
+  const entities = getLexicon($('entityTextarea'));
+  let strong = 0;
+  for (const e of entities) { if (isStrongEntity(e)) strong++; }
+  const fb = $('lexiconFeedback');
+  const exemptN = userExemptSet.size;
+  fb.textContent = `✓ 词库已更新（实体 ${entities.length}：强 ${strong} / 弱 ${entities.length - strong}${exemptN ? '，含豁免 ' + exemptN + ' 词' : ''}，领域 ${getLexicon($('domainTextarea')).length}，情感 ${getLexicon($('negTextarea')).length}）`;
+  fb.style.display = '';
+  log(`词库已确认更新 → 实体 ${entities.length}（强 ${strong}/弱 ${entities.length - strong}，豁免 ${exemptN}） | 领域 ${getLexicon($('domainTextarea')).length} | 情感 ${getLexicon($('negTextarea')).length}`, 'ok');
+  clearTimeout(window._lexFbTimer);
+  window._lexFbTimer = setTimeout(() => { fb.style.display = 'none'; }, 4000);
+});
+
+$('resetLexiconBtn').addEventListener('click', () => {
+  if (confirm('确定恢复默认词库？当前修改将丢失。')) {
+    initLexicon();
+    const fb = $('lexiconFeedback');
+    fb.textContent = '✓ 已恢复默认词库';
+    fb.style.display = '';
+    clearTimeout(window._lexFbTimer);
+    window._lexFbTimer = setTimeout(() => { fb.style.display = 'none'; }, 4000);
+  }
+});
+
+// ═══════════════════════════════════════════
+//  Tab 切换
+// ═══════════════════════════════════════════
+document.querySelectorAll('.main-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.main-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    $('tab-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+// ═══════════════════════════════════════════
+//  识别模式切换
+// ═══════════════════════════════════════════
+document.querySelectorAll('.mode-tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.mode-tab').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    currentMode = t.dataset.mode;
+    $('localConfigPanel').style.display = currentMode === 'local' ? '' : 'none';
+    $('aiConfigPanel').style.display = currentMode === 'ai' ? '' : 'none';
+  });
+});
+
+// ═══════════════════════════════════════════
+//  文件上传
+// ═══════════════════════════════════════════
+const uploadZone = $('uploadZone');
+const fileInput = $('fileInput');
+
+uploadZone.addEventListener('click', () => fileInput.click());
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) loadFile(f);
+});
+fileInput.addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
+$('topImportBtn').addEventListener('click', () => fileInput.click());
+
+function loadFile(file) {
+  if (!file.name.endsWith('.xlsx')) { alert('仅支持 .xlsx 格式文件'); return; }
+  originalFileName = file.name.replace(/\.xlsx$/i, '');
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      window._origArrayBuffer = ev.target.result.slice(0);
+      wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array', cellStyles: true });
+      log(`文件已加载: ${file.name}（${(file.size / 1024).toFixed(1)} KB）`, 'ok');
+      $('fileInfoName').textContent = file.name;
+
+      const sheets = wb.SheetNames;
+      const ws = wb.Sheets[sheets[0]];
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+      const rowCount = range.e.r; // 不含标题
+      $('fileInfoMeta').textContent = `${rowCount} 条数据 · ${sheets.length} 个工作表`;
+      $('fileInfoBlock').style.display = '';
+
+      // 多Sheet选择
+      const selectWrap = $('sheetSelectWrap');
+      const sel = $('sheetSelect');
+      sel.innerHTML = '';
+      sheets.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s; opt.textContent = s;
+        sel.appendChild(opt);
+      });
+      currentSheetName = sheets[0];
+      selectWrap.style.display = sheets.length > 1 ? '' : 'none';
+
+      // 抓取表头并渲染字段映射下拉框
+      const rawDataForHeaders = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      window.currentExcelHeaders = rawDataForHeaders.length > 0 ? rawDataForHeaders[0].map(h => String(h || '').trim()) : [];
+      renderMappingDropdowns(6); // 默认渲染 6 个，刚好凑成 3 行 2 列
+      populateExtractDropdown(); // 填充内容解析下拉框
+
+      $('startBtn').disabled = false;
+      setStatus('文件已加载', 'info');
+      resultRows = [];
+      renderPreview([]);
+    } catch (err) {
+      log('文件解析失败: ' + err.message, 'err');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+$('sheetSelect').addEventListener('change', e => {
+  currentSheetName = e.target.value;
+  log(`已切换工作表: ${currentSheetName}`, 'info');
+});
+
+// ═══════════════════════════════════════════
+//  阈值滑块
+// ═══════════════════════════════════════════
+function updateThresholdFill() {
+  const s = $('thresholdSlider');
+  const pct = ((s.value - s.min) / (s.max - s.min)) * 100;
+  s.style.setProperty('--pct', pct + '%');
+  $('thresholdVal').textContent = parseFloat(s.value).toFixed(2);
+}
+$('thresholdSlider').addEventListener('input', updateThresholdFill);
+updateThresholdFill();
+
+// ═══════════════════════════════════════════
+//  配置持久化（localStorage） - 修复版
+// ═══════════════════════════════════════════
+const STORAGE_KEY = 'yuqing_config';
+
+function saveConfig() {
+  const config = {
+    models: models.filter(m => !m.builtin),
+    activeModelId: activeModelId,
+    apiKeys: {},
+    // 将四个词库的内容也保存下来
+    lexicon: {
+      entity: $('entityTextarea').value,
+      domain: $('domainTextarea').value,
+      neg: $('negTextarea').value,
+      exempt: $('exemptTextarea').value
+    }
+  };
+
+  // 保存当前模型的API Key
+  models.forEach(m => {
+    const keyInput = $('apiKeyInput');
+    if (m.id === activeModelId && keyInput) {
+      config.apiKeys[m.id] = keyInput.value.trim();
+    }
+  });
+
+  // 保存额外的Key
+  const extraInput = $('extraKeysInput');
+  if (extraInput) {
+    config.extraKeys = extraInput.value.trim();
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  log('配置及词库已保存到本地', 'ok');
+}
+
+function loadConfig() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return null;
+    return JSON.parse(saved);
+  } catch (e) {
+    return null;
+  }
+}
+
+function applyConfig(config) {
+  if (!config) return;
+  // 恢复自定义模型
+  if (config.models && Array.isArray(config.models)) {
+    config.models.forEach(m => {
+      if (!models.find(x => x.id === m.id)) {
+        models.push(m);
+      }
+    });
+  }
+  // 恢复活跃模型
+  if (config.activeModelId && models.find(m => m.id === config.activeModelId)) {
+    activeModelId = config.activeModelId;
+  }
+  // 恢复API Key
+  setTimeout(() => {
+    if (config.apiKeys) {
+      const currentKey = config.apiKeys[activeModelId];
+      if (currentKey) {
+        $('apiKeyInput').value = currentKey;
+      }
+    }
+    if (config.extraKeys) {
+      const extraInput = $('extraKeysInput');
+      if (extraInput) extraInput.value = config.extraKeys;
+    }
+  }, 100);
+
+  // 恢复词库数据
+  if (config.lexicon) {
+    if (config.lexicon.entity !== undefined) $('entityTextarea').value = config.lexicon.entity;
+    if (config.lexicon.domain !== undefined) $('domainTextarea').value = config.lexicon.domain;
+    if (config.lexicon.neg !== undefined) $('negTextarea').value = config.lexicon.neg;
+    if (config.lexicon.exempt !== undefined) $('exemptTextarea').value = config.lexicon.exempt;
+    updateLexiconCounts(); // 刷新 UI 统计
+  }
+}
+
+// ═══════════════════════════════════════════
+//  模型管理
+// ═══════════════════════════════════════════
+function renderModelList() {
+  const list = $('modelList');
+  list.innerHTML = '';
+  models.forEach(m => {
+    const item = document.createElement('div');
+    item.className = 'model-item' + (m.id === activeModelId ? ' active' : '');
+    item.innerHTML = `
+      <div style="cursor:pointer;flex:1" onclick="selectModel('${m.id}')">
+        <div class="model-item-name">${escHtml(m.name)}</div>
+        <div class="model-item-url">${escHtml(m.url)}</div>
+      </div>
+      ${m.builtin ? '' : `<button class="btn btn-ghost btn-sm" onclick="removeModel('${m.id}')">删除</button>`}
+    `;
+    list.appendChild(item);
+  });
+}
+
+window.selectModel = function(id) {
+  activeModelId = id;
+  // 尝试加载已保存的Key
+  const config = loadConfig();
+  const savedKey = config?.apiKeys?.[id] || '';
+  $('apiKeyInput').value = savedKey;
+  $('keyStatus').className = 'badge badge-default';
+  $('keyStatus').textContent = savedKey ? '已加载保存的Key' : '未验证';
+  renderModelList();
+  saveConfig();
+};
+
+window.removeModel = function(id) {
+  models = models.filter(m => m.id !== id);
+  if (activeModelId === id) activeModelId = models[0]?.id || 'deepseek';
+  renderModelList();
+  saveConfig();
+};
+
+$('addModelBtn').addEventListener('click', () => {
+  $('newModelName').value = '';
+  $('newModelUrl').value = '';
+  $('newModelId').value = '';
+  $('addModelModal').classList.add('open');
+});
+
+$('cancelModelBtn').addEventListener('click', () => $('addModelModal').classList.remove('open'));
+
+$('confirmModelBtn').addEventListener('click', () => {
+  const name = $('newModelName').value.trim();
+  const url = $('newModelUrl').value.trim();
+  const modelId = $('newModelId').value.trim();
+  if (!name || !url || !modelId) { alert('请填写完整'); return; }
+  const id = 'custom_' + Date.now();
+  models.push({ id, name, url, modelId, builtin: false });
+  activeModelId = id;
+  $('addModelModal').classList.remove('open');
+  renderModelList();
+  saveConfig();
+});
+
+// 保存API Key按钮
+$('saveKeyBtn').addEventListener('click', () => {
+  saveConfig();
+  $('keyStatus').className = 'badge badge-success';
+  $('keyStatus').textContent = '✓ 已保存';
+  setTimeout(() => {
+    $('keyStatus').className = 'badge badge-default';
+    $('keyStatus').textContent = '已保存';
+  }, 2000);
+});
+
+// API Key 测试
+$('testKeyBtn').addEventListener('click', async () => {
+  const key = $('apiKeyInput').value.trim();
+  if (!key) { alert('请先填写 API Key'); return; }
+  const model = models.find(m => m.id === activeModelId);
+  if (!model) return;
+  $('keyStatus').className = 'badge badge-warn pulsing';
+  $('keyStatus').textContent = '测试中...';
+  try {
+    const res = await callLLM(model, key, '国家电网工资太低，招聘不公。', '请判断情感：负面/正面');
+    if (res.toLowerCase().includes('负面') || res.includes('true') || res.includes('负')) {
+      $('keyStatus').className = 'badge badge-success';
+      $('keyStatus').textContent = '✓ 调用成功';
+      log('API Key 测试通过', 'ok');
+    } else {
+      $('keyStatus').className = 'badge badge-success';
+      $('keyStatus').textContent = '✓ 调用成功';
+      log('API Key 调用成功（模型返回：' + res.slice(0, 40) + '）', 'ok');
+    }
+  } catch (e) {
+    $('keyStatus').className = 'badge badge-danger';
+    $('keyStatus').textContent = '✗ 调用失败';
+    log('API 测试失败: ' + e.message, 'err');
+  }
+  $('keyStatus').classList.remove('pulsing');
+});
+
+async function callLLM(model, apiKey, content, systemPrompt, maxRetries = 4) {
+  let attempt = 0;
+  while (true) {
+    let res;
+    try {
+      // 增加简单的超时机制
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15秒超时
+      
+      res = await fetch(model.url + '/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: model.modelId,
+          messages: [
+            { role: 'system', content: systemPrompt || '你是专业舆情分析员' },
+            { role: 'user', content: content }
+          ],
+          max_tokens: 256,
+          temperature: 0.1
+        })
+      });
+      clearTimeout(timeoutId);
+    } catch (netErr) {
+      // 网络抖动或超时：可重试
+      if (attempt < maxRetries) { await sleep(backoffMs(attempt)); attempt++; continue; }
+      throw netErr;
+    }
+    // 限速 / 服务端临时错误 → 退避重试
+    if ((res.status === 429 || res.status >= 500) && attempt < maxRetries) {
+      const ra = parseInt(res.headers.get('retry-after') || '', 10);
+      await sleep(Number.isFinite(ra) ? ra * 1000 : backoffMs(attempt));
+      attempt++;
+      continue;
+    }
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      throw new Error(`HTTP ${res.status}: ${txt.slice(0, 100)}`);
+    }
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content || '';
+  }
+}
+
+// 指数退避（带抖动）：0.8s, 1.6s, 3.2s, 6.4s …
+function backoffMs(attempt) {
+  return Math.round((0.8 * Math.pow(2, attempt)) * 1000 * (0.7 + Math.random() * 0.6));
+}
+
+// ═══════════════════════════════════════════
+//  本地评分核心
+// ═══════════════════════════════════════════
+function buildEntitySet() { return new Set(getLexicon($('entityTextarea')).map(w => w.toLowerCase())); }
+function buildDomainSet() { return new Set(getLexicon($('domainTextarea')).map(w => w.toLowerCase())); }
+function buildNegSet() { return new Set(getLexicon($('negTextarea')).map(w => w.toLowerCase())); }
+
+// 强实体：指向唯一、单独出现即可确认主体（含「国网/国家电网」或为具名子公司/省公司）
+// 弱实体：泛化、单独出现不足以确认主体，需与领域词邻近共现
+const STRONG_ENTITY_EXTRA = new Set([
+  '南瑞','许继','平高','英大','新源','中电装备','山东电工','南瑞继保'
+].map(w => w.toLowerCase()));
+
+// 用户自定义「强实体豁免词」：填入即强制判为强实体（绕过常规规则）
+let userExemptSet = new Set();
+function refreshExemptSet() {
+  const ta = $('exemptTextarea');
+  userExemptSet = new Set((ta ? getLexicon(ta) : []).map(w => w.toLowerCase()));
+}
+
+function isStrongEntity(word) {
+  const w = word.toLowerCase();
+  if (userExemptSet.has(w)) return true;                          // 用户强制豁免
+  if (w.includes('国网') || w.includes('国家电网')) return true;   // 国网XX 系列
+  if (STRONG_ENTITY_EXTRA.has(w)) return true;                     // 具名子公司
+  if (w.length >= 5) return true;                                  // 足够长的具名机构
+  return false;
+}
+
+function classifyEntities(entitySet) {
+  const strong = [], weak = [];
+  for (const e of entitySet) { (isStrongEntity(e) ? strong : weak).push(e); }
+  return { strong, weak };
+}
+
+function containsDomain(text, domainSet) {
+  if (!text) return false;
+  const t = text.toLowerCase();
+  for (const d of domainSet) { if (t.includes(d)) return true; }
+  return false;
+}
+
+// 列出文本中命中的全部某类词（用于结果展示）
+function listWordHits(text, wordList) {
+  if (!text) return [];
+  const lower = text.toLowerCase();
+  const hits = [];
+  for (const w of wordList) { if (w && lower.includes(w)) hits.push(w); }
+  return [...new Set(hits)];
+}
+
+// 找出文本中所有某词的出现位置（区间 [start,end)）
+function findOccurrences(lower, word) {
+  const res = [];
+  if (!word) return res;
+  let from = 0, idx;
+  while ((idx = lower.indexOf(word, from)) !== -1) {
+    res.push([idx, idx + word.length]);
+    from = idx + word.length;
+  }
+  return res;
+}
+
+// 实体门槛判定：
+//  - 强实体在文中任意位置出现 → 通过（主体明确）
+//  - 否则弱实体须与领域词「邻近共现」（间隔 ≤ proximity 字）→ 通过
+//  proximity<=0 表示关闭邻近约束，退化为「弱实体只要出现即可」
+function entityGate(text, strongList, weakList, domainList, proximity) {
+  if (!text) return false;
+  const lower = text.toLowerCase();
+
+  // 1. 强实体直接放行
+  for (const e of strongList) { if (lower.includes(e)) return true; }
+
+  if (!weakList.length) return false;
+
+  // 2. 弱实体：无邻近约束时，出现即可
+  if (proximity <= 0) {
+    for (const e of weakList) { if (lower.includes(e)) return true; }
+    return false;
+  }
+
+  // 3. 弱实体 + 领域词 邻近共现
+  const domainPos = [];
+  for (const d of domainList) {
+    for (const oc of findOccurrences(lower, d)) domainPos.push(oc);
+  }
+  if (!domainPos.length) return false;
+
+  for (const e of weakList) {
+    for (const [es, ee] of findOccurrences(lower, e)) {
+      for (const [ds, de] of domainPos) {
+        // 两区间最近边距
+        const gap = es >= de ? es - de : (ds >= ee ? ds - ee : 0);
+        if (gap <= proximity) return true;
+      }
+    }
+  }
+  return false;
+}
+
+// 返回 { score, hitWords }
+function localScore(text, negSet) {
+  if (!text) return { score: 0, hitWords: [] };
+  const lower = text.toLowerCase();
+  let score = 0;
+  const hitWords = [];
+
+  // 1. 复合短语（最高权重）
+  for (const phrase of COMPOUND_NEG) {
+    if (lower.includes(phrase.toLowerCase())) {
+      score += 1.5;
+      hitWords.push(phrase);
+    }
+  }
+
+  // 2. 负面词基础匹配
+  const parts = lower.split(/[\s,，。、；;！!？?<>《》()\[\]【】"""'''\n\r\t]+/).filter(w => w.length > 0);
+  const usedWords = new Set();
+  for (let i = 0; i < parts.length; i++) {
+    const w = parts[i];
+    if (negSet.has(w) && !usedWords.has(w)) {
+      let weight = 1.0;
+      // 强度副词前置
+      if (i > 0 && ['非常','极其','严重','十分','特别','超级','巨'].includes(parts[i-1])) weight += 0.3;
+      // 叠词强调
+      if (i > 0 && parts[i-1] === w) weight = 1.8;
+      score += weight;
+      usedWords.add(w);
+      hitWords.push(w);
+    }
+  }
+
+  // 3. 子串兜底（针对词典中的长词组）
+  for (const nw of negSet) {
+    if (nw.length >= 2 && lower.includes(nw) && !usedWords.has(nw)) {
+      score += 0.5;
+      hitWords.push(nw);
+    }
+  }
+
+  // 4. 否定词+否定组合额外加分
+  const negations = ['没有','不会','无法','不能','不予'];
+  for (const ng of negations) {
+    if (lower.includes(ng)) { score += 0.3; break; }
+  }
+
+  // 5. 标点强化
+  if (/[！!]{2,}|？！|！？/.test(text)) score += 0.2;
+
+  return { score: Math.min(1.0, score / 2.5), hitWords: [...new Set(hitWords)] };
+}
+
+// ═══════════════════════════════════════════
+//  开始识别
+// ═══════════════════════════════════════════
+$('startBtn').addEventListener('click', startAnalysis);
+$('stopBtn').addEventListener('click', () => { shouldStop = true; log('用户中止识别', 'warn'); });
+
+async function startAnalysis() {
+  if (!wb) return;
+  if (isRunning) return;
+  isRunning = true;
+  shouldStop = false;
+  resultRows = [];
+
+  // 释放上一次导出的 Blob 缓存，防止内存泄漏
+  if (window._exportBlob) {
+    window._exportBlob = null;
+  }
+  if (window._extractBlob) {
+    window._extractBlob = null;
+  }
+
+  $('startBtn').disabled = true;
+  $('stopBtn').style.display = '';
+  $('progressWrap').style.display = '';
+  $('topExportBtn').disabled = true;
+  setStatus('识别中...', 'warn');
+
+  // 切换到日志tab
+  document.querySelectorAll('.main-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelector('.main-tab[data-tab="log"]').classList.add('active');
+  $('tab-log').classList.add('active');
+
+  const start = Date.now();
+  log('═══════════════════════════════', 'info');
+  log(`开始识别 | 模式: ${currentMode === 'ai' ? 'AI模式（本地+LLM）' : '本地模式'} | Sheet: ${currentSheetName || wb.SheetNames[0]}`, 'info');
+
+  const sheetName = currentSheetName || wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+  const rawData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+  if (rawData.length < 2) {
+    log('数据为空或只有标题行', 'err');
+    finishAnalysis(start);
+    return;
+  }
+
+  const headers = rawData[0].map(h => (h || '').toString().trim());
+  const idxYq = headers.findIndex(h => h.includes('是否舆情') || h.includes('舆情标记'));
+
+  // 检查用户是否在"字段映射"中进行了自定义选择
+  const mappingSelects = document.querySelectorAll('.mapping-select');
+  const customCols = [];
+  mappingSelects.forEach(sel => {
+    if (sel.value !== "") customCols.push(parseInt(sel.value, 10));
+  });
+
+  let targetCols = []; // 最终决定要分析的列集合
+
+  if (customCols.length > 0) {
+    // 方案 A：用户有自定义选择，严格遵循用户的选择
+    log(`检测到自定义字段映射，已覆盖系统默认规则，将扫描指定的 ${customCols.length} 列`, 'info');
+    targetCols = customCols.map(idx => ({ colIdx: idx, label: headers[idx] || `列${idx}` }));
+  } else {
+    // 方案 B：用户未选择，使用经典的默认探测逻辑
+    const idxTitle = headers.findIndex(h => h.includes('标题') || h.includes('微博内容'));
+    const idxAbs = headers.findIndex(h => h === '摘要');
+
+    log(`默认列映射 → 标题列:${idxTitle >= 0 ? headers[idxTitle]+'('+idxTitle+')' : '未找到'} | 摘要列:${idxAbs >= 0 ? headers[idxAbs]+'('+idxAbs+')' : '未找到'} | 结果列:${idxYq >= 0 ? headers[idxYq]+'('+idxYq+')' : '默认 B 列'}`, 'info');
+
+    if (idxTitle < 0 && idxAbs < 0) {
+      log('未找到默认分析列（标题/摘要），请去「字段映射」中手动指定要分析的列。', 'err');
+      finishAnalysis(start);
+      return;
+    }
+
+    targetCols = [
+      { colIdx: idxTitle, label: '标题' },
+      { colIdx: idxAbs, label: '摘要' }
+    ];
+  }
+
+  const requireEntity = $('requireEntity').checked;
+  const threshold = parseFloat($('thresholdSlider').value);
+  refreshExemptSet();
+  const entitySet = buildEntitySet();
+  const domainSet = buildDomainSet();
+  const negSet = buildNegSet();
+
+  // 实体词分层 + 邻近共现距离
+  const { strong: strongEntities, weak: weakEntities } = classifyEntities(entitySet);
+  const domainList = [...domainSet];
+  const proxEl = $('proximityInput');
+  const proximity = proxEl ? parseInt(proxEl.value, 10) || 0 : 30;
+
+  log(`词库规模 → 实体词: ${entitySet.size}（强 ${strongEntities.length} / 弱 ${weakEntities.length}） | 领域词: ${domainSet.size} | 负面词: ${negSet.size}`, 'info');
+  log(`阈值: ${threshold.toFixed(2)} | 实体词过滤: ${requireEntity ? '开启' : '关闭'} | 弱实体邻近共现距离: ${proximity > 0 ? proximity + '字' : '关闭'}`, 'info');
+
+  const totalRows = rawData.length - 1;
+  let localMarked = 0;
+
+  // ── 本地模式扫描 ──
+  log(`开始本地扫描，共 ${totalRows} 行...`, 'info');
+
+  // 每行的命中情况记录，用于后续写xlsx
+  // hitInfo[rowIdx] = { yqYes: bool, cells: [{colIdx, hitWords, entityHits, domainHits}] }
+  const hitInfo = new Map();
+
+  const BATCH = 200;
+  for (let r = 1; r < rawData.length; r++) {
+    if (shouldStop) break;
+
+    // 进度
+    if (r % BATCH === 0 || r === rawData.length - 1) {
+      const pct = Math.round((r / (rawData.length - 1)) * 100);
+      $('progressFill').style.width = pct + '%';
+      $('progressInfo').textContent = `本地扫描 ${r} / ${totalRows}`;
+      $('progressPct').textContent = pct + '%';
+      $('statTotal').textContent = r;
+      await sleep(0);
+    }
+
+    const row = rawData[r];
+
+    let rowHit = false;
+    const cellHits = [];
+
+    // 逐字段独立判断（兼容默认与自定义）
+    for (const target of targetCols) {
+      const colIdx = target.colIdx;
+      if (colIdx < 0 || colIdx === undefined) continue;
+
+      const text = String(row[colIdx] || '');
+      const label = target.label;
+      if (!text) continue;
+
+      // 实体词门槛：强实体直接放行；弱实体须与领域词邻近共现
+      if (requireEntity && !entityGate(text, strongEntities, weakEntities, domainList, proximity)) continue;
+      // 领域词门槛
+      if (!containsDomain(text, domainSet)) continue;
+
+      const { score, hitWords } = localScore(text, negSet);
+      if (score >= threshold && hitWords.length > 0) {
+        rowHit = true;
+        const entityHits = listWordHits(text, [...strongEntities, ...weakEntities]);
+        const domainHits = listWordHits(text, domainList);
+        cellHits.push({ colIdx, hitWords, label, entityHits, domainHits });
+      }
+    }
+
+    if (rowHit) {
+      localMarked++;
+      hitInfo.set(r, { yqYes: true, cells: cellHits });
+      resultRows.push({ rowIdx: r, rowData: row, hitCells: cellHits, aiConfirmed: false, headers });
+      $('statMarked').textContent = localMarked;
+    }
+  }
+
+  log(`本地扫描完成，共标记 ${localMarked} 行`, localMarked > 0 ? 'warn' : 'ok');
+
+  // ── AI 二次核验（并发池 + 多 Key 轮询）──
+  let aiMarked = 0;
+  if (currentMode === 'ai' && !shouldStop) {
+    const primaryKey = $('apiKeyInput').value.trim();
+    const extraKeys = ($('extraKeysInput') ? $('extraKeysInput').value : '')
+      .split('\n').map(s => s.trim()).filter(Boolean);
+    const keys = [...new Set([primaryKey, ...extraKeys].filter(Boolean))];
+    const model = models.find(m => m.id === activeModelId);
+    let concurrency = parseInt(($('concurrencyInput') || {}).value, 10);
+    if (!Number.isFinite(concurrency) || concurrency < 1) concurrency = 8;
+    concurrency = Math.min(32, concurrency);
+
+    if (!keys.length || !model) {
+      log('AI模式：未配置 API Key 或模型，跳过 LLM 核验', 'warn');
+    } else {
+      const aiTotal = resultRows.length;
+      log(`AI核验开始 → ${aiTotal} 条 | 并发 ${concurrency} | Key 数 ${keys.length}${keys.length > 1 ? '（轮询）' : ''}`, 'info');
+
+      const systemP = `你是一名专业的企业舆情分析员，专门识别与国家电网公司招聘和薪酬管理相关的负面信息。\n只输出 JSON，不要输出任何其他内容。`;
+      let done = 0;
+      let nextIdx = 0;        // 任务游标
+      let keyCursor = 0;      // Key 轮询游标
+
+      // 单个任务：核验第 i 条
+      async function processOne(i) {
+        const rr = resultRows[i];
+        const row = rr.rowData;
+
+        try {
+          // 修复：动态遍历 targetCols（尊重用户的自定义字段映射）
+          let combinedContent = '';
+          for (const target of targetCols) {
+            if (target.colIdx >= 0) {
+              const text = String(row[target.colIdx] || '').trim();
+              if (text) combinedContent += `【${target.label}】：${text}\n`;
+            }
+          }
+
+          const prompt = buildAIPrompt(combinedContent);
+          const key = keys[(keyCursor++) % keys.length];   // 轮询分配 Key
+
+          const reply = await callLLM(model, key, prompt, systemP);
+          const json = parseAIReply(reply);
+
+          if (json && json.overall_negative === true) {
+            rr.aiConfirmed = true;
+            aiMarked++;
+            $('statAI').textContent = aiMarked;
+          }
+        } catch (e) {
+          log(`AI核验第${i + 1}条失败: ${e.message}，保留本地标记`, 'warn');
+        } finally {
+          done++;
+          if (done % 5 === 0 || done === aiTotal) {
+            const pct = Math.round((done / aiTotal) * 100);
+            $('progressFill').style.width = pct + '%';
+            $('progressInfo').textContent = `AI 核验 ${done} / ${aiTotal}`;
+            $('progressPct').textContent = pct + '%';
+          }
+        }
+      }
+
+      // 并发 worker：持续领取下一条，直到取完或被中止
+      async function worker() {
+        while (true) {
+          if (shouldStop) return;
+          const i = nextIdx++;
+          if (i >= aiTotal) return;
+          await processOne(i);
+        }
+      }
+
+      const workers = [];
+      for (let w = 0; w < Math.min(concurrency, aiTotal); w++) workers.push(worker());
+      await Promise.all(workers);
+
+      log(`AI核验完成，确认负面: ${aiMarked} 条`, aiMarked > 0 ? 'warn' : 'ok');
+    }
+  }
+
+  // ── 写入 xlsx（使用 ExcelJS 实现三类关键词对应颜色）──
+  log('开始生成标注文件...', 'info');
+
+  // 保持进度条面板显示
+  $('progressWrap').style.display = '';
+  $('stopBtn').style.display = 'none'; // 导出阶段不可中止
+
+  try {
+    // 传入进度回调函数，实时更新 UI
+    window._exportBlob = await buildOutputWorkbookEJS(
+      idxYq,
+      hitInfo,
+      resultRows,
+      currentMode === 'ai',
+      (msg, pct) => {
+        $('progressFill').style.width = pct + '%';
+        $('progressInfo').textContent = msg;
+        $('progressPct').textContent = pct + '%';
+      }
+    );
+    window._exportWb = null;
+  } catch (e) {
+    log('标注文件生成失败: ' + e.message, 'err');
+    window._exportBlob = null;
+  }
+  window._exportFileName = originalFileName + '-识别结果.xlsx';
+
+  $('topExportBtn').disabled = false;
+
+  // 更新统计
+  const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+  $('statTime').textContent = elapsed + 's';
+  $('statTotal').textContent = totalRows;
+
+  log(`识别完成 ✓ | 总行: ${totalRows} | 本地标记: ${localMarked} | AI确认: ${aiMarked} | 耗时: ${elapsed}s`, 'ok');
+  log('═══════════════════════════════', 'info');
+
+  // 切换到结果tab
+  document.querySelectorAll('.main-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelector('.main-tab[data-tab="result"]').classList.add('active');
+  $('tab-result').classList.add('active');
+
+  renderPreview(resultRows);
+  $('resultCount').textContent = localMarked + ' 条本地标记';
+  if (currentMode === 'ai') {
+    $('resultAICount').style.display = '';
+    $('resultAICount').textContent = aiMarked + ' 条 AI 确认';
+  }
+
+  setStatus(`完成 | ${localMarked} 条负面`, 'success');
+  finishAnalysis(start);
+}
+
+function finishAnalysis(start) {
+  isRunning = false;
+  $('startBtn').disabled = false;
+  $('stopBtn').style.display = 'none';
+  $('progressWrap').style.display = 'none';
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ═══════════════════════════════════════════
+//  AI Prompt 构建 + 解析
+// ═══════════════════════════════════════════
+function buildAIPrompt(content) {
+  return `请判断以下内容是否包含针对国家电网公司在【招聘过程】（笔试、面试、录用、公平性等）或【薪酬管理】（工资、奖金、绩效、福利等）方面的明确负面评价、投诉或质疑。
+
+判断标准：
+- 存在明显的负面情绪、投诉、曝光、质疑招聘公正性、薪酬不公等内容 → 负面
+- 中性陈述、正面评价、无关内容 → 非负面
+- 不确定时倾向于判断为非负面
+
+待判断内容：
+${content || '（空）'}
+
+请严格按如下 JSON 格式输出，不输出任何其他文字：
+{"overall_negative":true/false,"reason":"简要说明（20字内）"}`;
+}
+
+function parseAIReply(reply) {
+  try {
+    const clean = reply.replace(/```json|```/g, '').trim();
+    const m = clean.match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    return JSON.parse(m[0]);
+  } catch { return null; }
+}
+
+// ═══════════════════════════════════════════
+//  关键词级富文本：支持三类词（实体蓝、领域紫、情感红）着色
+// ═══════════════════════════════════════════
+function buildRichText(text, entityHits, domainHits, negHits) {
+  if (!text) return null;
+  
+  // 按照 UI 中的颜色设置对应的 ARGB 
+  // 实体(蓝): #60a5fa -> FF60A5FA
+  // 领域(紫): #a78bfa -> FFA78BFA
+  // 情感(红): #ef4444 -> FFEF4444
+  const wordCategories = [
+    { words: [...new Set(entityHits || [])].filter(Boolean), argb: 'FF60A5FA' },
+    { words: [...new Set(domainHits || [])].filter(Boolean), argb: 'FFA78BFA' },
+    { words: [...new Set(negHits || [])].filter(Boolean), argb: 'FFEF4444' }
+  ];
+  
+  // 验证是否有命中的词
+  if (!wordCategories.some(cat => cat.words.length > 0)) return null;
+  
+  const lower = text.toLowerCase();
+  
+  // 使用与原文本等长的数组来记录每个字符的颜色，默认为 null（无色）
+  const charColors = new Array(text.length).fill(null);
+  
+  // 依次应用染色规则。因为是依次覆盖，所以排在后面的优先级更高。
+  // 设定优先级：情感(红) > 领域(紫) > 实体(蓝)
+  for (const cat of wordCategories) {
+    // 对命中词按长度降序排列，确保长词优先整体匹配（如果在同一类别中）
+    const words = cat.words.sort((a, b) => b.length - a.length);
+    for (const w of words) {
+      const wl = w.toLowerCase();
+      if (!wl) continue;
+      let from = 0, idx;
+      while ((idx = lower.indexOf(wl, from)) !== -1) {
+        // 给匹配到的区间字符上色
+        for (let k = idx; k < idx + wl.length; k++) {
+          charColors[k] = cat.argb;
+        }
+        from = idx + wl.length;
+      }
+    }
+  }
+  
+  // 如果没有任何字符被上色，直接返回 null
+  if (!charColors.some(Boolean)) return null; 
+  
+  const runs = [];
+  let i = 0;
+  while (i < text.length) {
+    const color = charColors[i];
+    let j = i;
+    // 聚合颜色相同的连续字符
+    while (j < text.length && charColors[j] === color) j++;
+    const seg = text.slice(i, j);
+    
+    if (color) {
+      runs.push({ text: seg, font: { color: { argb: color }, name: 'Microsoft YaHei' } });
+    } else {
+      runs.push({ text: seg, font: { name: 'Microsoft YaHei' } });
+    }
+    
+    i = j;
+  }
+  
+  return { richText: runs };
+}
+
+// ═══════════════════════════════════════════
+//  生成输出 Workbook（优化版：时间分片防假死）
+//  返回 Blob，供 doExport 直接下载
+// ═══════════════════════════════════════════
+async function buildOutputWorkbookEJS(idxYq, hitInfo, aiRows, isAIMode, onProgress) {
+  if (!window._origArrayBuffer) throw new Error('原始文件缓存丢失，请重新上传');
+
+  const sheetName = currentSheetName || wb.SheetNames[0];
+  const yqColIdx = idxYq >= 0 ? idxYq : 1;
+  const yqColEJS = yqColIdx + 1;
+
+  const aiConfirmedSet = new Set(aiRows.filter(r => r.aiConfirmed).map(r => r.rowIdx));
+  const cellsByRow = new Map();
+  for (const [rowIdx, info] of hitInfo) cellsByRow.set(rowIdx, info.cells);
+
+  if (onProgress) onProgress('正在加载原始文档...', 10);
+  const ejsWb = new ExcelJS.Workbook();
+  await ejsWb.xlsx.load(window._origArrayBuffer.slice(0));
+
+  let ws = ejsWb.getWorksheet(sheetName) || ejsWb.worksheets[0];
+  if (!ws) throw new Error('未找到工作表');
+
+  if (onProgress) onProgress('正在渲染高亮结果...', 30);
+
+  let processedCount = 0;
+  const totalHits = cellsByRow.size;
+
+  for (const [rowIdx, cells] of cellsByRow) {
+    const excelRow = rowIdx + 1;
+    const isAIConfirmed = aiConfirmedSet.has(rowIdx);
+
+    // B 列写"是"：本地=黑色；AI确认=红色加粗
+    const yqCell = ws.getCell(excelRow, yqColEJS);
+    yqCell.value = '是';
+    yqCell.font = {
+      name: 'Microsoft YaHei',
+      color: { argb: isAIConfirmed ? 'FFFF0000' : 'FF000000' },
+      bold: !!isAIConfirmed
+    };
+
+    // 命中单元格：命中关键词三类分别着色
+    for (const { colIdx, hitWords, entityHits, domainHits } of cells) {
+      if (colIdx < 0) continue;
+      const cell = ws.getCell(excelRow, colIdx + 1);
+      // 跳过公式单元格，避免破坏底层 XML 结构
+      if (cell.formula) continue;
+      const text = (cell.text != null ? String(cell.text) : (cell.value != null ? String(cell.value) : ''));
+      const rt = buildRichText(text, entityHits, domainHits, hitWords);
+      if (rt) cell.value = rt;
+    }
+
+    processedCount++;
+    // 核心优化：每渲染 50 行，主动释放一次主线程，避免 UI 卡死
+    if (processedCount % 50 === 0) {
+      if (onProgress) {
+        // 估算渲染进度 (30% ~ 70% 之间)
+        const renderPct = 30 + Math.round((processedCount / totalHits) * 40);
+        onProgress(`正在渲染高亮... ${processedCount}/${totalHits}`, renderPct);
+      }
+      await sleep(0);
+    }
+  }
+
+  if (onProgress) onProgress('正在封装导出文件 (这可能需要几秒钟)...', 80);
+
+  // 留出时间让浏览器渲染上一句提示
+  await sleep(50);
+
+  const buf = await ejsWb.xlsx.writeBuffer();
+  if (onProgress) onProgress('文件生成完毕', 100);
+
+  return new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
+
+// ═══════════════════════════════════════════
+//  预览
+// ═══════════════════════════════════════════
+function renderPreview(rows) {
+  const wrap = $('previewWrap');
+  if (!rows.length) {
+    wrap.innerHTML = `<div class="empty-state"><div class="emoji">🔎</div><p>识别完成后，结果将展示在这里<br>仅显示被标记为负面舆情的数据行</p></div>`;
+    return;
+  }
+  const headers = rows[0].headers;
+
+  // 展示关键列：行号、是否舆情、标题、摘要、命中词、AI确认
+  const cols = ['行号'];
+  const titleLabel = headers.find(h => h.includes('标题') || h.includes('微博内容')) || '标题';
+  const absLabel = headers.find(h => h === '摘要') || '摘要';
+  cols.push(titleLabel, absLabel, '命中词（实体/领域/情感）', 'AI 确认');
+
+  let html = `<div class="preview-wrap"><table class="preview-table"><thead><tr>`;
+  cols.forEach(c => { html += `<th>${escHtml(c)}</th>`; });
+  html += `</tr></thead><tbody>`;
+
+  for (const rr of rows) {
+    const row = rr.rowData;
+    const idxTitle = rr.headers.findIndex(h => h.includes('标题') || h.includes('微博内容'));
+    const idxAbs = rr.headers.findIndex(h => h === '摘要');
+    const entityHits = [...new Set(rr.hitCells.flatMap(c => c.entityHits || []))];
+    const domainHits = [...new Set(rr.hitCells.flatMap(c => c.domainHits || []))];
+    const negHits = [...new Set(rr.hitCells.flatMap(c => c.hitWords || []))];
+
+    const chip = (w, color) => `<span style="display:inline-block;padding:1px 7px;margin:2px 3px 2px 0;border-radius:6px;font-size:11px;background:${color}1a;color:${color};border:1px solid ${color}55;">${escHtml(w)}</span>`;
+    let kwHtml = '';
+    if (entityHits.length) kwHtml += `<div style="margin-bottom:2px;"><span style="font-size:10px;color:var(--text3);">实体</span> ${entityHits.map(w => chip(w, '#60a5fa')).join('')}</div>`;
+    if (domainHits.length) kwHtml += `<div style="margin-bottom:2px;"><span style="font-size:10px;color:var(--text3);">领域</span> ${domainHits.map(w => chip(w, '#a78bfa')).join('')}</div>`;
+    if (negHits.length) kwHtml += `<div><span style="font-size:10px;color:var(--text3);">情感</span> ${negHits.map(w => chip(w, '#ef4444')).join('')}</div>`;
+    if (!kwHtml) kwHtml = '—';
+
+    html += `<tr class="row-marked">
+      <td>${rr.rowIdx}</td>
+      <td class="hit" title="${escHtml(String(row[idxTitle] || ''))}">${escHtml(String(row[idxTitle] || '').slice(0, 50))}${(row[idxTitle]||'').length > 50 ? '…' : ''}</td>
+      <td class="hit" title="${escHtml(String(row[idxAbs] || ''))}">${escHtml(String(row[idxAbs] || '').slice(0, 50))}${(row[idxAbs]||'').length > 50 ? '…' : ''}</td>
+      <td style="min-width:220px;">${kwHtml}</td>
+      <td class="${rr.aiConfirmed ? 'yq-ai' : ''}">${rr.aiConfirmed ? '✓ 已确认' : '—'}</td>
+    </tr>`;
+  }
+  html += '</tbody></table></div>';
+  wrap.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════
+//  导出
+// ═══════════════════════════════════════════
+function doExport() {
+  // 优先导出含抓取原文的版本，其次导出识别结果版本
+  const blob = window._extractBlob || window._exportBlob;
+  const fileName = window._extractBlob ? window._extractFileName : (window._exportFileName || '识别结果.xlsx');
+
+  if (!blob) { alert('请先运行识别或内容解析'); return; }
+  try {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+    log(`文件已导出: ${fileName}`, 'ok');
+  } catch (e) {
+    log('导出失败: ' + e.message, 'err');
+  }
+}
+
+$('topExportBtn').addEventListener('click', doExport);
+
+// 清空日志
+$('clearLogBtn').addEventListener('click', () => { $('logPanel').innerHTML = ''; });
+
+// ═══════════════════════════════════════════
+//  字段映射 UI 逻辑
+// ═══════════════════════════════════════════
+function renderMappingDropdowns(count) {
+  const container = $('mappingContainer');
+  container.innerHTML = ''; // 清空原有内容
+  $('addMappingBtn').style.display = 'inline-flex'; // 显示添加按钮
+
+  for (let i = 0; i < count; i++) {
+    addMappingRow();
+  }
+}
+
+function addMappingRow() {
+  const container = $('mappingContainer');
+  const headers = window.currentExcelHeaders || [];
+  const index = container.children.length + 1;
+
+  const row = document.createElement('div');
+  row.className = 'form-row';
+
+  // 生成下拉选项
+  let optionsHtml = `<option value="">-- 不指定 (保持系统默认) --</option>`;
+  headers.forEach((h, idx) => {
+    optionsHtml += `<option value="${idx}">${escHtml(h || `列 ${idx + 1}`)}</option>`;
+  });
+
+  row.innerHTML = `
+    <div class="form-label" style="width: 60px;">分析列 ${index}</div>
+    <select class="mapping-select" style="flex:1; padding:8px 12px; background:var(--surface3); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:13px; outline:none;">
+      ${optionsHtml}
+    </select>
+  `;
+  container.appendChild(row);
+}
+
+// 绑定添加按钮事件
+$('addMappingBtn').addEventListener('click', addMappingRow);
+
+// ═══════════════════════════════════════════
+//  内容解析功能
+// ═══════════════════════════════════════════
+
+// 检测是否在 Electron 环境中
+const isElectron = typeof window !== 'undefined' && typeof window.electronAPI !== 'undefined';
+
+// web 端显示提示，exe 端显示功能区
+if (!isElectron) {
+  $('extractWebNotice').style.display = '';
+  $('extractMainArea').style.display = 'none';
+}
+
+// 并发数滑块
+function updateExtractConcurrencyFill() {
+  const s = $('extractConcurrency');
+  const pct = ((s.value - s.min) / (s.max - s.min)) * 100;
+  s.style.setProperty('--pct', pct + '%');
+  $('extractConcurrencyVal').textContent = s.value;
+}
+$('extractConcurrency').addEventListener('input', updateExtractConcurrencyFill);
+updateExtractConcurrencyFill();
+
+// 上传文件后填充下拉框
+function populateExtractDropdown() {
+  if (!window.currentExcelHeaders || !window.currentExcelHeaders.length) return;
+  const sel = $('extractColSelect');
+  sel.innerHTML = '<option value="">-- 请选择包含 URL 的列 --</option>';
+  window.currentExcelHeaders.forEach((h, idx) => {
+    const opt = document.createElement('option');
+    opt.value = idx;
+    opt.textContent = h || `列 ${idx + 1}`;
+    sel.appendChild(opt);
+  });
+  // 按钮保持禁用，等用户选择列后才启用
+  $('extractStartBtn').disabled = true;
+}
+
+// 下拉框选择变化
+$('extractColSelect').addEventListener('change', () => {
+  $('extractStartBtn').disabled = !$('extractColSelect').value;
+});
+
+// 开始解析
+$('extractStartBtn').addEventListener('click', async () => {
+  if (!wb) { alert('请先上传 Excel 文件'); return; }
+  const colIdx = parseInt($('extractColSelect').value, 10);
+  if (isNaN(colIdx)) { alert('请选择包含 URL 的列'); return; }
+
+  const concurrency = parseInt($('extractConcurrency').value, 10) || 20;
+  const sheetName = currentSheetName || wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+  const rawData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+  if (rawData.length < 2) { alert('数据为空'); return; }
+
+  // 收集所有 URL
+  const urlTasks = [];
+  for (let r = 1; r < rawData.length; r++) {
+    const cellText = String(rawData[r][colIdx] || '').trim();
+    const urlMatch = cellText.match(/https?:\/\/[^\s<>"]+/);
+    if (urlMatch) {
+      urlTasks.push({ rowIdx: r, url: urlMatch[0] });
+    }
+  }
+
+  if (!urlTasks.length) { alert('所选列中未找到 URL'); return; }
+
+  // UI 状态
+  $('extractStartBtn').disabled = true;
+  $('extractProgressWrap').style.display = '';
+  $('extractStatSuccess').textContent = '0';
+  $('extractStatLogin').textContent = '0';
+  $('extractStatFail').textContent = '0';
+
+  const total = urlTasks.length;
+  let done = 0, success = 0, login = 0, fail = 0;
+
+  log(`内容解析开始 → ${total} 条 URL | 并发 ${concurrency}`, 'info');
+
+  try {
+    // 通过 IPC 发送给主进程处理
+    const results = await window.electronAPI.extractUrls(urlTasks, concurrency, (progress) => {
+      // 登录通知消息不计入进度
+      if (progress.message) {
+        log(progress.message, 'warn');
+        return;
+      }
+
+      // 仅对有 rowIdx 的实际结果计数，且不超过总数
+      if (progress.rowIdx !== undefined && done < total) {
+        done++;
+        if (progress.status === 'success') success++;
+        else if (progress.status === 'login') login++;
+        else fail++;
+
+        const pct = Math.min(100, Math.round((done / total) * 100));
+        $('extractProgressFill').style.width = pct + '%';
+        $('extractProgressInfo').textContent = `解析中 ${done} / ${total}`;
+        $('extractProgressPct').textContent = pct + '%';
+        $('extractStatSuccess').textContent = success;
+        $('extractStatLogin').textContent = login;
+        $('extractStatFail').textContent = fail;
+      }
+    });
+
+    // 写入 Excel
+    log(`内容解析完成 → 成功: ${success} | 需登录: ${login} | 失败: ${fail}`, 'ok');
+    writeExtractResults(results);
+
+  } catch (e) {
+    log('内容解析失败: ' + e.message, 'err');
+  }
+
+  $('extractStartBtn').disabled = false;
+  log('内容解析完成 ✓', 'ok');
+});
+
+// 将提取结果写入 Excel（使用 ExcelJS 保留原格式）
+async function writeExtractResults(results) {
+  if (!results || !results.length) { log('没有提取结果可写入', 'warn'); return; }
+  if (!window._origArrayBuffer) { log('原始文件缓存丢失，无法写入', 'err'); return; }
+
+  // 调试日志
+  const successCount = results.filter(r => r.status === 'success' && r.text).length;
+  log(`准备写入 ${results.length} 条结果（其中成功提取 ${successCount} 条）`, 'info');
+
+  try {
+    const sheetName = currentSheetName || wb.SheetNames[0];
+
+    // 使用 ExcelJS 读取原始文件，保留所有格式
+    const ejsWb = new ExcelJS.Workbook();
+    await ejsWb.xlsx.load(window._origArrayBuffer.slice(0));
+
+    let ws = ejsWb.getWorksheet(sheetName) || ejsWb.worksheets[0];
+    if (!ws) { log('未找到工作表', 'err'); return; }
+
+    // 获取最大列数
+    let maxCol = 0;
+    ws.eachRow((row) => {
+      let lastCol = 0;
+      row.eachCell({ includeEmpty: false }, (cell, colNumber) => { lastCol = colNumber; });
+      if (lastCol > maxCol) maxCol = lastCol;
+    });
+
+    const writeCol = maxCol + 1; // ExcelJS 1-based
+
+    // 写入表头
+    const headerCell = ws.getCell(1, writeCol);
+    headerCell.value = '抓取原文';
+    headerCell.font = { name: 'Microsoft YaHei', bold: true };
+
+    // 写入提取结果
+    let writtenCount = 0;
+    for (const result of results) {
+      const rowNum = result.rowIdx + 1; // rowIdx 是 0-based，ExcelJS 是 1-based
+      const cell = ws.getCell(rowNum, writeCol);
+      const textToWrite = result.text || '提取失败';
+      cell.value = textToWrite;
+      cell.font = { name: 'Microsoft YaHei' };
+      writtenCount++;
+
+      // 调试：前3条记录详细日志
+      if (writtenCount <= 3) {
+        log(`写入行${rowNum}列${writeCol}: "${textToWrite.substring(0, 30)}..."`, 'info');
+      }
+    }
+
+    // 生成独立的导出 Blob
+    const buf = await ejsWb.xlsx.writeBuffer();
+    window._extractBlob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    window._extractFileName = (originalFileName || '数据') + '-含抓取原文.xlsx';
+
+    log(`已将 ${writtenCount} 条结果写入「抓取原文」列（第 ${writeCol} 列）`, 'ok');
+    log('含抓取原文的文件已生成，请点击"导出结果"下载', 'ok');
+
+    // 启用导出按钮
+    $('topExportBtn').disabled = false;
+
+  } catch (e) {
+    log('写入提取结果失败: ' + e.message, 'err');
+  }
+}
+
+// ═══════════════════════════════════════════
+//  初始化
+// ═══════════════════════════════════════════
+initLexicon();
+
+// 加载保存的配置
+const savedConfig = loadConfig();
+if (savedConfig) {
+  applyConfig(savedConfig);
+  log('已加载保存的配置（模型和API Key）', 'ok');
+}
+
+renderModelList();
+log('系统就绪。请上传 .xlsx 原始数据文件开始使用。', 'ok');
+log('支持功能：本地词库识别（三类关键词精准标色）+ AI二次核验（DeepSeek/自定义模型）', 'info');
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,49 @@
+{
+  "name": "yuqing-monitor",
+  "version": "1.0.0",
+  "description": "国网人资舆情筛查系统",
+  "main": "main.js",
+  "author": "",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.yuqing.monitor",
+    "productName": "YuqingMonitor",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "lib/**/*"
+    ],
+    "win": {
+      "executableName": "YuqingMonitor",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "unicode": true,
+      "allowElevation": true,
+      "shortcutName": "国网人资舆情筛查系统",
+      "deleteAppDataOnUninstall": true,
+      "artifactName": "YuqingMonitor-Setup-${version}.${ext}",
+      "runAfterFinish": true
+    }
+  },
+  "scripts": {
+    "start": "electron main.js",
+    "build": "electron-builder --win"
+  }
+}
