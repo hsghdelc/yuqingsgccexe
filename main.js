@@ -523,62 +523,306 @@ function registerHandlers() {
         throw new Error('文件内容为空');
       }
 
-      // ── 步骤 2：调用 Dify 工作流（传递纯文本）──
-      event.sender.send('reverse-progress', { requestId, percent: 30, message: '正在调用 AI 分析（可能需要几分钟）...' });
+      // ── 步骤 2：客户端分批调用 Dify 工作流 ──
+      event.sender.send('reverse-progress', { requestId, percent: 15, message: '正在准备数据分批...' });
 
-      const postData = JSON.stringify({
-        inputs: {
-          query: textContent
-        },
-        response_mode: 'blocking',
-        user: 'yuqing-user'
-      });
-
-      console.log('[词库逆向] 请求数据大小:', Buffer.byteLength(postData), '字节');
-
-      const workflowResult = await new Promise((resolve, reject) => {
-        const req = https.request({
-          hostname: 'api.dify.ai',
-          path: '/v1/workflows/run',
-          method: 'POST',
-          headers: {
-            'Authorization': 'Bearer app-1ym5vAj6lBVAq9klfpVZJyRU',
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(postData)
-          }
-        }, (res) => {
-          let data = '';
-          res.on('data', chunk => { data += chunk; });
-          res.on('end', () => {
-            console.log('[词库逆向] 响应状态码:', res.statusCode);
-            console.log('[词库逆向] 响应前500字:', data.substring(0, 500));
-            try { resolve(JSON.parse(data)); } catch (e) { reject(new Error('响应解析失败')); }
-          });
-          res.on('error', reject);
-        });
-        req.on('error', reject);
-        req.write(postData);
-        req.end();
-      });
-
-      // ── 步骤 3：提取结果 ──
-      event.sender.send('reverse-progress', { requestId, percent: 90, message: '正在解析结果...' });
-
-      let markdown = '';
-
-      if (workflowResult.data && workflowResult.data.outputs) {
-        markdown = workflowResult.data.outputs.result || workflowResult.data.outputs.text || '';
-      } else if (workflowResult.outputs) {
-        markdown = workflowResult.outputs.result || workflowResult.outputs.text || '';
+      // 将数据按 300 行一批拆分（每批保留表头）
+      const headerRow = jsonData[0];
+      const dataRows = jsonData.slice(1);
+      const CHUNK_SIZE = 300;
+      const chunks = [];
+      for (let i = 0; i < dataRows.length; i += CHUNK_SIZE) {
+        const chunkRows = dataRows.slice(i, i + CHUNK_SIZE);
+        // 每批都带上表头
+        const chunkText = [headerRow, ...chunkRows]
+          .map(row => row.map(cell => String(cell || '')).join('\t'))
+          .join('\n');
+        chunks.push(chunkText);
       }
 
-      if (markdown) markdown = markdown.trim();
+      const totalChunks = chunks.length;
+      console.log(`[词库逆向] 共 ${dataRows.length} 行数据，分为 ${totalChunks} 批，每批 ${CHUNK_SIZE} 行`);
 
-      console.log('[词库逆向] 结果长度:', markdown ? markdown.length : 0);
+      // 调用单个批次的 Dify 工作流（streaming 模式）
+      async function callDifyChunk(chunkText, chunkIndex, retries = 2) {
+        const postData = JSON.stringify({
+          inputs: { query: chunkText },
+          response_mode: 'streaming',
+          user: 'yuqing-user'
+        });
+
+        for (let attempt = 0; attempt <= retries; attempt++) {
+          try {
+            if (attempt > 0) {
+              console.log(`[词库逆向] 第 ${chunkIndex + 1} 批重试第 ${attempt} 次`);
+              await new Promise(r => setTimeout(r, 2000 * attempt)); // 退避等待
+            }
+
+            const result = await new Promise((resolve, reject) => {
+              const req = https.request({
+                hostname: 'api.dify.ai',
+                path: '/v1/workflows/run',
+                method: 'POST',
+                headers: {
+                  'Authorization': 'Bearer app-1ym5vAj6lBVAq9klfpVZJyRU',
+                  'Content-Type': 'application/json',
+                  'Content-Length': Buffer.byteLength(postData)
+                },
+                timeout: 300000 // 单批 5 分钟超时
+              }, (res) => {
+                console.log(`[词库逆向] 第 ${chunkIndex + 1} 批 HTTP 响应:`, res.statusCode, 'headers:', JSON.stringify(res.headers).substring(0, 500));
+                if (res.statusCode !== 200) {
+                  let errData = '';
+                  res.on('data', chunk => { errData += chunk; });
+                  res.on('end', () => {
+                    console.error(`[词库逆向] 第 ${chunkIndex + 1} 批 API 错误:`, res.statusCode, errData.substring(0, 300));
+                    reject(new Error(`Dify API 返回 ${res.statusCode}`));
+                  });
+                  return;
+                }
+
+                let buffer = '';
+                let finalResult = null;
+                let nodeOutputs = []; // 收集所有 node_finished 的输出作为备用
+                const receivedEvents = []; // 诊断日志
+                let rawDataLog = ''; // 记录原始响应用于诊断
+
+                function parseSSEPart(part) {
+                  let eventType = '';
+                  let eventData = '';
+                  for (const line of part.split('\n')) {
+                    if (line.startsWith('event: ')) eventType = line.substring(7).trim();
+                    else if (line.startsWith('data: ')) eventData = line.substring(6);
+                  }
+                  // Dify 格式：event 类型在 JSON 内部的 "event" 字段
+                  if (!eventType && eventData) {
+                    try {
+                      const parsed = JSON.parse(eventData);
+                      if (parsed.event) eventType = parsed.event;
+                    } catch (e) {}
+                  }
+                  return { eventType, eventData };
+                }
+
+                function processSSEEvent(eventType, eventData) {
+                  if (!eventType || !eventData) return;
+                  try {
+                    const parsed = JSON.parse(eventData);
+                    receivedEvents.push(eventType);
+                    console.log(`[词库逆向] 第 ${chunkIndex + 1} 批 SSE 事件:`, eventType);
+
+                    if (eventType === 'workflow_finished') {
+                      finalResult = parsed;
+                      // 检查是否有错误
+                      if (parsed.data && parsed.data.error) {
+                        console.error(`[词库逆向] 第 ${chunkIndex + 1} 批工作流错误:`, parsed.data.error);
+                      }
+                    } else if (eventType === 'node_finished') {
+                      // 收集节点输出作为备用结果
+                      if (parsed.data && parsed.data.outputs) {
+                        nodeOutputs.push(parsed.data.outputs);
+                        console.log(`[词库逆向] 第 ${chunkIndex + 1} 批节点完成:`, parsed.data.title || 'unknown');
+                      }
+                    }
+                  } catch (e) {
+                    console.warn('[词库逆向] SSE 事件解析失败:', part.substring(0, 200));
+                  }
+                }
+
+                res.on('data', chunk => {
+                  const chunkStr = chunk.toString().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                  rawDataLog += chunkStr;
+                  console.log(`[词库逆向] 第 ${chunkIndex + 1} 批收到数据块 (${chunkStr.length} 字符):`, chunkStr.substring(0, 200));
+                  buffer += chunkStr;
+                  const parts = buffer.split('\n\n');
+                  buffer = parts.pop();
+
+                  for (const part of parts) {
+                    if (!part.trim()) continue;
+                    const { eventType, eventData } = parseSSEPart(part);
+                    processSSEEvent(eventType, eventData);
+                  }
+                });
+
+                res.on('end', () => {
+                  console.log(`[词库逆向] 第 ${chunkIndex + 1} 批连接结束，原始数据总长度: ${rawDataLog.length} 字符`);
+
+                  // 处理残留 buffer
+                  if (buffer.trim()) {
+                    const { eventType, eventData } = parseSSEPart(buffer);
+                    processSSEEvent(eventType, eventData);
+                  }
+
+                  // 优先使用 SSE 解析到的结果
+                  if (finalResult) {
+                    resolve(finalResult);
+                    return;
+                  }
+
+                  if (nodeOutputs.length > 0) {
+                    // 备用方案：从 node_finished 的输出中提取结果
+                    console.warn(`[词库逆向] 第 ${chunkIndex + 1} 批未收到 workflow_finished，尝试从 ${nodeOutputs.length} 个节点输出中提取结果`);
+                    const fallbackResult = { data: { outputs: {} } };
+                    for (const outputs of nodeOutputs) {
+                      if (outputs.markdown_table) fallbackResult.data.outputs.markdown_table = outputs.markdown_table;
+                      if (outputs.result) fallbackResult.data.outputs.result = outputs.result;
+                      if (outputs.text) fallbackResult.data.outputs.text = outputs.text;
+                    }
+                    if (fallbackResult.data.outputs.markdown_table || fallbackResult.data.outputs.result || fallbackResult.data.outputs.text) {
+                      resolve(fallbackResult);
+                      return;
+                    }
+                  }
+
+                  // 最终备用：尝试将整个响应解析为 JSON（兼容非 SSE 格式）
+                  if (rawDataLog.trim()) {
+                    // 先尝试直接在整个响应中搜索 markdown_table
+                    const mtMatch = rawDataLog.match(/"markdown_table"\s*:\s*"((?:[^"\\]|\\[\s\S])*)"/);
+                    if (mtMatch) {
+                      try {
+                        const mdContent = JSON.parse('"' + mtMatch[1] + '"');
+                        console.log(`[词库逆向] 第 ${chunkIndex + 1} 批通过正则提取到 markdown_table (${mdContent.length} 字符)`);
+                        resolve({ data: { outputs: { markdown_table: mdContent } } });
+                        return;
+                      } catch (e) {}
+                    }
+
+                    try {
+                      const normalized = rawDataLog.trim().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                      const jsonObj = JSON.parse(normalized);
+                      console.log(`[词库逆向] 第 ${chunkIndex + 1} 批响应为 JSON 格式，keys:`, Object.keys(jsonObj).join(', '));
+                      // 兼容多种 JSON 结构
+                      if (jsonObj.data && jsonObj.data.outputs) {
+                        resolve(jsonObj);
+                        return;
+                      } else if (jsonObj.outputs) {
+                        resolve({ data: jsonObj });
+                        return;
+                      } else if (jsonObj.markdown_table || jsonObj.result) {
+                        resolve({ data: { outputs: { markdown_table: jsonObj.markdown_table, result: jsonObj.result } } });
+                        return;
+                      } else if (jsonObj.event === 'workflow_finished' && jsonObj.data) {
+                        resolve(jsonObj);
+                        return;
+                      } else if (jsonObj.status === 'success' && jsonObj.markdown_table) {
+                        resolve({ data: { outputs: { markdown_table: jsonObj.markdown_table } } });
+                        return;
+                      }
+                      console.warn(`[词库逆向] 第 ${chunkIndex + 1} 批 JSON 结构不匹配，顶层 keys:`, Object.keys(jsonObj).join(', '));
+                    } catch (e) {
+                      console.warn(`[词库逆向] 第 ${chunkIndex + 1} 批响应非 JSON，解析错误:`, e.message);
+                    }
+                  }
+
+                  // 将原始响应写入文件供诊断
+                  try {
+                    const debugPath = path.join(app.getPath('desktop'), 'dify-debug-response.txt');
+                    fs.writeFileSync(debugPath, rawDataLog, 'utf-8');
+                    console.log(`[词库逆向] 原始响应已保存到: ${debugPath}`);
+                  } catch (e) {
+                    console.warn('[词库逆向] 保存调试文件失败:', e.message);
+                  }
+
+                  reject(new Error(`第 ${chunkIndex + 1} 批工作流未返回结果（原始数据: ${rawDataLog.length}字符）`));
+                });
+
+                res.on('error', reject);
+              });
+
+              req.on('error', reject);
+              req.on('timeout', () => {
+                req.destroy();
+                reject(new Error('单批请求超时'));
+              });
+              req.write(postData);
+              req.end();
+            });
+
+            return result; // 成功，返回结果
+          } catch (e) {
+            console.error(`[词库逆向] 第 ${chunkIndex + 1} 批失败 (attempt ${attempt + 1}):`, e.message);
+            if (attempt === retries) throw e; // 最后一次重试也失败，抛出错误
+          }
+        }
+      }
+
+      // 提取 Dify 结果中的 markdown
+      function extractMarkdown(workflowResult) {
+        if (workflowResult.data && workflowResult.data.outputs) {
+          const o = workflowResult.data.outputs;
+          return o.markdown_table || o.result || o.text || '';
+        } else if (workflowResult.outputs) {
+          const o = workflowResult.outputs;
+          return o.markdown_table || o.result || o.text || '';
+        }
+        return '';
+      }
+
+      // 逐批调用并合并结果
+      const allMarkdowns = [];
+      for (let i = 0; i < totalChunks; i++) {
+        const basePercent = 20;
+        const chunkPercent = Math.round((i / totalChunks) * 70);
+        event.sender.send('reverse-progress', {
+          requestId,
+          percent: basePercent + chunkPercent,
+          message: `正在分析第 ${i + 1}/${totalChunks} 批（每批 ${CHUNK_SIZE} 行）...`
+        });
+
+        console.log(`[词库逆向] 开始处理第 ${i + 1}/${totalChunks} 批`);
+        const workflowResult = await callDifyChunk(chunks[i], i);
+        const md = extractMarkdown(workflowResult);
+
+        if (md && md.trim()) {
+          allMarkdowns.push(md.trim());
+          console.log(`[词库逆向] 第 ${i + 1} 批完成，结果长度: ${md.trim().length}`);
+        } else {
+          console.warn(`[词库逆向] 第 ${i + 1} 批返回空结果`);
+        }
+      }
+
+      // ── 步骤 3：合并所有批次结果 ──
+      event.sender.send('reverse-progress', { requestId, percent: 92, message: '正在合并分析结果...' });
+
+      let markdown = allMarkdowns.join('\n\n');
+
+      // 如果有多个批次的结果，尝试去重（按关键词去重）
+      if (allMarkdowns.length > 1) {
+        try {
+          // 解析 markdown 表格，按关键词去重
+          const rows = [];
+          const seenKeywords = new Set();
+          for (const md of allMarkdowns) {
+            const lines = md.split('\n');
+            for (const line of lines) {
+              // 匹配 markdown 表格行（以 | 开头，排除表头分隔行 |---|）
+              if (line.startsWith('|') && !line.match(/^\|[\s-:]+\|/)) {
+                const cols = line.split('|').map(c => c.trim()).filter(Boolean);
+                if (cols.length >= 2) {
+                  const keyword = cols[0];
+                  if (!seenKeywords.has(keyword)) {
+                    seenKeywords.add(keyword);
+                    rows.push(line);
+                  }
+                }
+              } else if (!line.startsWith('|') && line.trim()) {
+                // 非表格行（如标题、说明等），直接保留
+                rows.push(line);
+              }
+            }
+          }
+          if (rows.length > 0) {
+            markdown = rows.join('\n');
+          }
+        } catch (e) {
+          console.warn('[词库逆向] 结果去重失败，使用原始合并结果:', e.message);
+        }
+      }
+
+      console.log('[词库逆向] 最终结果长度:', markdown.length, '字符');
 
       if (!markdown) {
-        console.error('[词库逆向] 完整响应:', JSON.stringify(workflowResult).substring(0, 1000));
-        throw new Error('Dify 未返回有效结果，请检查控制台日志');
+        throw new Error('所有批次均未返回有效结果，请检查数据格式或稍后重试');
       }
 
       event.sender.send('reverse-progress', { requestId, percent: 100, message: '分析完成' });
